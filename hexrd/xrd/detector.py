@@ -158,17 +158,6 @@ def getCMap(spec):
         raise RuntimeError, 'unknown: '+str(spec)
     return cmap
 
-
-
-def omeToFrameRange(omega, omegas, omegaDelta):
-    """
-    check omega range for the frames instead of omega center;
-    result can be a pair of frames if the specified omega is
-    exactly on the border
-    """
-    retval = num.where(num.abs(omegas - omega) <= omegaDelta*0.5)[0]
-    return retval
-
 class LineStyles:
     """
     do not want to just cycle through default plot line colors, as end up with black lines
@@ -3699,13 +3688,6 @@ class Detector2DRC(DetectorBase):
             polImg['intensity'][i, :] = (tmpI.sum(1) / binIdSum).T
 
         return polImg
-
-
-def mar165IDim(mode):
-    if not isinstance(mode, int) or not [1,2,4,8].count(mode):
-        raise RuntimeError, 'unknown mode : '+str(mode)
-    idim = 4096 / mode
-    return idim
 
 class DetectorGeomMar165(Detector2DRC):
     __vfu = 0.2 # made up

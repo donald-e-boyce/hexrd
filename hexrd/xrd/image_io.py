@@ -472,36 +472,7 @@ class ReadGeneric(Framer2DRC):
                             count=self.nrows*self.ncols)
         return data
 
-    def getNFrames(self, lessEmpty=True):
-        fileBytes = os.stat(self.filename).st_size
-        nFrames = getNFramesFromBytes(fileBytes, self.__nbytes_header, self.nbytesFrame)
-        if lessEmpty:
-            nFrames -= self.__nempty
-        return nFrames
 
-    def getOmegaMinMax(self):
-        assert self.omegas is not None,\
-            """instance does not have omega information"""
-        return self.omegaMin, self.omegaMax
-    def getDeltaOmega(self, nframes=1):
-        assert self.omegas is not None,\
-            """instance does not have omega information"""
-        return self.omegaDelta * nframes
-    def getDark(self):
-        'no dark yet supported'
-        return 0
-    def getFrameOmega(self, iFrame=None):
-        """if iFrame is none, use internal counter"""
-        assert self.omegas is not None,\
-            """instance does not have omega information"""
-        if iFrame is None:
-            iFrame = self.iFrame
-        if hasattr(iFrame, '__len__'):
-            'take care of case nframes>1 in last call to read'
-            retval = num.mean(self.omegas[iFrame])
-        else:
-            retval = self.omegas[iFrame]
-        return retval
 
     def getWriter(self, filename):
         # if not self.doFlip is False:
@@ -1199,6 +1170,21 @@ class ThreadReadFrame(threading.Thread):
 #
 # Module functions
 #
+def mar165IDim(mode):
+    if not isinstance(mode, int) or not [1,2,4,8].count(mode):
+        raise RuntimeError, 'unknown mode : '+str(mode)
+    idim = 4096 / mode
+    return idim
+
+def omeToFrameRange(omega, omegas, omegaDelta):
+    """
+    check omega range for the frames instead of omega center;
+    result can be a pair of frames if the specified omega is
+    exactly on the border
+    """
+    retval = num.where(num.abs(omegas - omega) <= omegaDelta*0.5)[0]
+    return retval
+
 def getNFramesFromBytes(fileBytes, nbytesHeader, nbytesFrame):
     assert (fileBytes - nbytesHeader) % nbytesFrame == 0,\
         'file size not correct'
