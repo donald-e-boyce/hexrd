@@ -3689,42 +3689,6 @@ class Detector2DRC(DetectorBase):
 
         return polImg
 
-class DetectorGeomMar165(Detector2DRC):
-    __vfu = 0.2 # made up
-    __vdk = 1800 # made up
-    def __init__(self, *args, **kwargs):
-
-        mode = 1
-        if kwargs.has_key('mode'):
-            mode = kwargs.pop('mode')
-        readerClass = eval('ReadMar165NB%d' % (mode))
-        idim = mar165IDim(mode)
-        nrows = ncols = idim
-        pixelPitch = 165.0 / idim # mm
-        reader = readerClass()
-
-        self.mode = mode
-
-        Detector2DRC.__init__(self,
-                              nrows, ncols, pixelPitch,
-                              self.__vfu, self.__vdk,
-                              reader,
-                              *args, **kwargs)
-        return
-
-    def getDParamDflt(self):
-        return []
-    def setDParamZero(self):
-        return
-    def getDParamScalings(self):
-        return []
-    def getDParamRefineDflt(self):
-        return []
-    #
-    def radialDistortion(self, xin, yin, invert=False):
-        'no distortion correction'
-        return xin, yin
-
 class DetectorGeomGE(Detector2DRC):
     """
     handle geometry of GE detector, such as geometric and radial distortion corrections;

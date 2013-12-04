@@ -26,11 +26,6 @@ Fix bug in FrameWriter: duplicated line
 import copy
 import os
 import time
-try:
-    import threading
-    haveThreading = True
-except:
-    haveThreading = False
 
 import numpy as num
 
@@ -144,30 +139,7 @@ class Framer2DRC(object):
                 pw  = None,
                 **kwargs
                 ):
-        # ... interpolation method that looks like max() so that do not miss peak pixels?
-
-        if roi is not None:
-            dROI   = thisframe[ roi[0][0]:roi[0][1], roi[1][0]:roi[1][1] ]
-        else:
-            dROI = thisframe
-        vmin, vmax, cmap = cls.getDisplayArgs(dROI, kwargs)
-
-        if havePlotWrap:
-            if pw is None:
-                p = plotwrap.PlotWrap(**kwargs)
-                kwargs = {}
-            else:
-                p = pw
-            p(dROI, vmin=vmin, vmax=vmax, cmap=cmap, **kwargs)
-            # 'turn off format_coord because have not made this one report correctly'
-            # p.a.format_coord = lambda x,y: ''
-        # elif havePylab:
-        #     assert pw is None, 'do not specify pw without plotwrap'
-        #     retval = pylab.imshow(dROI, vmin=vmin, vmax=vmax, cmap=cm.bone)
-        else:
-            raise RuntimeError, 'no plotting pacakge available'
-
-        retval = p
+        raise NotImplementedError('display method no longer implemented')
         return retval
 
     @classmethod
@@ -521,7 +493,6 @@ class ReadGE(Framer2DRC):
     __frame_dtype_float = 'float64'
     __nbytes_frame     = num.nbytes[num.uint16]*__nrows*__ncols # = 2*__nrows*__ncols
     __debug = False
-    __useThreading = True and haveThreading
     __location = '  ReadGE'
     __readArgs = {
         'dtype' : __frame_dtype_read,
@@ -616,18 +587,6 @@ class ReadGE(Framer2DRC):
 
         return
 
-    # property:  useThreading
-
-    @property
-    def useThreading(self):
-        """turn threading on or off"""
-        return self.__useThreading
-
-    @useThreading.setter
-    def useThreading(self, v):
-        """Set method for useThreading"""
-        self.__useThreading = haveThreading and v
-        return
 
     @classmethod
     def display(cls,
@@ -1125,24 +1084,6 @@ class ReadMar165(Framer2DRC):
         return frame
 
 
-class ReadMar165NB1(ReadMar165):
-    def __init__(self, *args, **kwargs):
-        ReadMar165.__init__(self, 1, *args, **kwargs)
-        return
-class ReadMar165NB2(ReadMar165):
-    def __init__(self, *args, **kwargs):
-        ReadMar165.__init__(self, 2, *args, **kwargs)
-        return
-class ReadMar165NB3(ReadMar165):
-    def __init__(self, *args, **kwargs):
-        ReadMar165.__init__(self, 3, *args, **kwargs)
-        return
-class ReadMar165NB4(ReadMar165):
-    def __init__(self, *args, **kwargs):
-        ReadMar165.__init__(self, 4, *args, **kwargs)
-
-        return
-
 class ThreadReadFrame(threading.Thread):
     def __init__(self, img, readArgs, castArgs):
         threading.Thread.__init__(self)
@@ -1170,12 +1111,6 @@ class ThreadReadFrame(threading.Thread):
 #
 # Module functions
 #
-def mar165IDim(mode):
-    if not isinstance(mode, int) or not [1,2,4,8].count(mode):
-        raise RuntimeError, 'unknown mode : '+str(mode)
-    idim = 4096 / mode
-    return idim
-
 def omeToFrameRange(omega, omegas, omegaDelta):
     """
     check omega range for the frames instead of omega center;
