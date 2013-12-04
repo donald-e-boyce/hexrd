@@ -1055,35 +1055,6 @@ class ReadGE(Framer2DRC):
         mask[indices] = True
       return mask
 
-#
-# MAR detectors: not yet functional
-#
-class ReadMar165(Framer2DRC):
-    """
-    placeholder; not yet really implemented
-
-    """
-    __frame_dtype_read = 'uint16'
-    __frame_dtype_dflt = 'int16' # good for doing subtractions
-    def __init__(self, mode):
-        if not isinstance(mode, int) or not [1,2,4,8].count(mode):
-            raise RuntimeError, 'unknown mode : '+str(mode)
-
-        self.__mode = mode
-        self.__idim = mar165IDim(mode)
-        return
-    def __call__(self, filename):
-        if not haveImageModule:
-            msg = "PIL Image module is required for this operation, "\
-                "but not loaded\n"
-            raise NameError(msg)
-
-        i = Image.open(filename, mode='r')
-        a = num.array(i, dtype=self.__frame_dtype_read)
-        frame = num.array(a, dtype=self.__frame_dtype_dflt)
-        return frame
-
-
 class ThreadReadFrame(threading.Thread):
     def __init__(self, img, readArgs, castArgs):
         threading.Thread.__init__(self)
