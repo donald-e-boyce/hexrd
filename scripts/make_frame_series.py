@@ -18,44 +18,71 @@ from fabio import file_series
 
 # Error messages
 
+ERR_NO_FILE = 'Append specified, but could not open file'
+ERR_NO_DATA = 'Append specified, but dataset not found in file'
+ERR_OVERWRITE = 'Failed to create new dataset. Does it already exist?'
 ERR_SHAPE = 'Image shape not consistent with previous images'
 
-def write_file(a):
-    f =h5py.File(a.outfile, "w")
-    frame_grp = f.create_group("frames")
+DSetPath = lambda f, p: "%s['%s']" % (f, p)
 
-    imgnum = 0
-    shape = None
+def write_file(a):
+    #
+    # Get shape and dtype information from files
+    #
+    shp, dtp = image_info(a)
+    #
+    # If append option is true, file and target group must exist;
+    # otherwise, file may exist but may not already contain the
+    # target dataset.
+    #
+    if a.append:
+        try:
+            f = h5py.File(a.outfile, "r+")
+        except:
+            errmsg = '%s: %s' % (ERR_NO_FILE, a.outfile)
+            raise RuntimeError(errmsg)
+
+        ds = f.get(a.dset)
+        if ds is None:
+            errmsg = '%s: %s' % (ERR_NO_DATA, DSetPath(a.outfile, a.dset))
+            raise RuntimeError(errmsg)
+    else:
+        f = h5py.File(a.outfile, "a")
+        try:
+            ds = f.create_dataset(a.dset, (0, shp[0], shp[1]), dtp,
+                                  maxshape=(None, shp[0], shp[1]))
+        except:
+            errmsg = '%s: %s' % (ERR_OVERWRITE, DSetPath(a.outfile, a.dset))
+            raise RuntimeError(errmsg)
+    #
+    # Now add the images
+    # . empty frames only apply to multiframe images
+    #
+    nframes = ds.shape[0]
     nfiles = len(a.imagefiles)
     for i in range(nfiles):
-        logging.debug('file %d of %d' % (i, nfiles))
+        logging.debug('processing file %d of %d' % (i, nfiles))
         img_i = fabio.open(a.imagefiles[i])
-        if shape is None:
-            shape = img_i.data.shape
-            logging.debug('shape is: %d X %d' )
-        else:
-            if not shape == img_i.data.shape:
-                raise ValueError(ERR_SHAPE)
-        for j in range(img_i.nframes):
-            logging.debug('processing image %d of %d' % (j, img_i.nframes))
-            logging.debug('image_number: %d' % imgnum)
-            if j < a.empty:
+        nfi = img_i.nframes
+        for j in range(nfi):
+            logging.debug('... processing image %d of %d' % (j, img_i.nframes))
+            if nfi > 1 and j < a.empty:
                 logging.debug('...empty frame ... skipping')
                 continue
-
-            dset = frame_grp.create_dataset(str(imgnum), img_i.data.shape,
-                                            img_i.data.dtype, img_i.data)
-            if (j + 1) < img_i.nframes:
+            nframes += 1
+            ds.resize(nframes, 0)
+            ds[nframes - 1, :, :] = img_i.data
+            if (j + 1) < nfi:
                 img_i = img_i.next()
-            imgnum += 1
         pass
 
-    nframes = imgnum
-    frame_grp.attrs['nframes'] = nframes
-    frame_grp.attrs['shape'] = shape
-    logging.debug('number of frames: %d' % nframes)
-
+    f.close()
     return
+
+def image_info(a):
+    """Return shape and dtype of first image"""
+    img_0 = fabio.open(a.imagefiles[0])
+    return img_0.data.shape, img_0.data.dtype
 
 def describe_imgs(a):
     print 'image files are: ', a.imagefiles
@@ -69,11 +96,16 @@ def describe_imgs(a):
 def set_options():
     """Set options for command line"""
     parser = argparse.ArgumentParser(description="frame series builder")
+
+    parser.add_argument("-o", "--outfile", help="name of HDF5 output file",
+                        default="frame_series.h5")
     parser.add_argument("-a", "--append",
                         help="append to output file instead of making a new one",
                         action="store_true")
-    parser.add_argument("-o", "--outfile", help="name of HDF5 output file",
-                        default="frame_series.h5")
+
+    help_d = "path to HDF5 data set"
+    parser.add_argument("-d", "--dset", help=help_d, default="/frame_series")
+
     parser.add_argument("-i", "--info", help="describe the input files and quit",
                         action="store_true")
     parser.add_argument("--empty", "--blank",
