@@ -6,8 +6,6 @@ Framer2DRC: base class for reader/writers
 FrameWriter: simple image writer
 ReadGeneric:
 ReadGE:
-ReadMar165: not yet functional
-ReadMard165*: not yet functional
 
 ThreadReadFrame: class for using threads to read frames
 
@@ -26,12 +24,14 @@ Fix bug in FrameWriter: duplicated line
 import copy
 import os
 import time
+import warnings
 
 import numpy as num
 
+warnings.filterwarnings('always', '', DeprecationWarning)
+
 class Framer2DRC(object):
-    """
-    Base class for readers.
+    """Base class for readers.
 
     You can make an instance of this class and use it for most of the
     things a reader would do, other than actually reading frames
@@ -139,8 +139,8 @@ class Framer2DRC(object):
                 pw  = None,
                 **kwargs
                 ):
-        raise NotImplementedError('display method no longer implemented')
-        return retval
+        warnings.warn('display method on readers no longer implemented',
+                      ReaderDeprecationWarning)
 
     @classmethod
     def getDisplayArgs(cls, dROI, kwargs):
@@ -570,7 +570,6 @@ class ReadGE(Framer2DRC):
             if isinstance(self.dark, str):
                 darkFile = self.dark
                 self.dark = ReadGE.readDark(darkFile, nframes=self.nDarkFrames)
-                self.__log('got dark from %d frames in file %s' % (self.nDarkFrames, darkFile))
             elif isinstance(self.dark, num.ndarray):
                 assert self.dark.size == self.__nrows * self.__ncols, \
                     'self.dark wrong size'
@@ -578,7 +577,6 @@ class ReadGE(Framer2DRC):
                 if self.dark.dtype.name == self.__frame_dtype_read:
                     'protect against unsigned-badness when subtracting'
                     self.dark = self.dark.astype(self.__frame_dtype_dflt)
-                self.__log('got dark from ndarray input')
             else:
                 raise RuntimeError, 'do not know what to do with dark of type : '+str(type(self.dark))
 
@@ -595,37 +593,9 @@ class ReadGE(Framer2DRC):
                 pw  = None,
                 **kwargs
                 ):
-        'this is a bit ugly in that it sidesteps the dtypeRead property'
-        retval = Framer2DRC.display(thisframe, roi=roi, pw=pw, dtypeRead=cls.__frame_dtype_read)
-        return retval
+        warnings.warn('display method on readers no longer implemented',
+                      ReaderDeprecationWarning)
 
-    @classmethod
-    def readRaw(cls, fname, mode='raw', headerlen=0):
-        '''
-        read a raw binary file;
-        if specified, headerlen is in bytes;
-        does not do any flipping
-        '''
-        print cls
-        if hasattr(cls, 'doFlip'):
-            print 'has doFlip'
-        img = open(fname, mode='rb')
-        if headerlen > 0:
-            img.seek(headerlen, 0)
-        if mode == 'raw' or mode == 'avg':
-            dtype = cls.__frame_dtype_read
-        elif mode == 'sum':
-            dtype = 'float32'
-        else:
-            raise RuntimeError, 'unknown mode : '+str(mode)
-        thisframe = num.fromfile(img, dtype=dtype, count=cls.__nrows*cls.__ncols).reshape(cls.__nrows, cls.__ncols)
-        return thisframe
-    def rawRead(self, *args, **kwargs):
-        '''
-        wrapper around readRaw that does the same flipping as the reader instance from which it is called
-        '''
-        thisframe = self.__flip(self.readRaw(*args, **kwargs))
-        return thisframe
     @classmethod
     def readDark(cls, darkFile, nframes=1):
         'dark subtraction is done before flipping, so do not flip when reading either'
@@ -787,7 +757,6 @@ class ReadGE(Framer2DRC):
                         self.img, **self.__readArgs
                         ).reshape(self.__nrows, self.__ncols) * scale
                 self.dark.astype(self.__frame_dtype_dflt)
-                self.__log('got dark from %d empty frames in file %s' % (nempty, fname))
             else:
                 self.img.seek(self.nbytesFrame*nempty, 1)
             self.nFramesRemain -= nempty
@@ -939,43 +908,13 @@ class ReadGE(Framer2DRC):
             'make iFrame a list so that omega or whatever can be averaged appropriately'
             self.iFrame = iFrameList
         return imgOut
-    def __log(self, message):
-        if self.__debug:
-            print self.__location+' : '+message
-        return
-    def __thWait(self):
-        if self.__useThreading:
-            if self.th is not None:
-                if self.th.isAlive():
-                    self.__log('wait for existing thread to finish')
-                    tic = time.time()
-                    self.th.join()
-                    toc = time.time(); dt = toc - tic;
-                    self.__log('--- existing thread has finished (%g seconds)' % (dt))
-                else:
-                    self.__log('existing thread already finished')
-            # if done:
-            #    self.th = None
-        return
-    def __thCheck(self):
-        data = None
-        if self.__useThreading:
-            self.__thWait()
-            if self.th is not None:
-                if not self.th.success:
-                    raise RuntimeError, 'failed to get image data'
-                data = self.th.data
-                self.nFramesRemain -= 1
-                self.th = None
-        return data
+
     def __readNext(self, nskip=0):
 
         if self.img is None:
             raise RuntimeError, 'no image file set'
 
         nHave = 0
-        if self.__useThreading:
-            data = self.__thCheck()
 
         nskipThis = nskip
         if nskipThis > 0 and data is not None:
@@ -999,25 +938,12 @@ class ReadGE(Framer2DRC):
             data = num.array(data, **self.__castArgs)
             self.nFramesRemain -= 1
 
-        if self.__useThreading:
-            'try to get next frame'
-            if self.nFramesRemain < 1:
-                try:
-                    self.__nextFile()
-                except:
-                    'if len((self.fileListR) == 0 then at end of files'
-                    assert len(self.fileListR) == 0, \
-                        'problem opening next file'
-                    self.img = None
-            if self.img is not None:
-                self.th = ThreadReadFrame(self.img, self.__readArgs, self.__castArgs)
-                self.th.start()
         return data
     def __call__(self, *args, **kwargs):
         return self.read(*args, **kwargs)
+
     def close(self):
         # if already have a file going, close it out
-        self.__thWait()
         if self.img is not None:
             self.img.close()
         return
@@ -1054,31 +980,6 @@ class ReadGE(Framer2DRC):
       else:
         mask[indices] = True
       return mask
-
-class ThreadReadFrame(threading.Thread):
-    def __init__(self, img, readArgs, castArgs):
-        threading.Thread.__init__(self)
-
-        self.img   = img
-        # self.dtype = dtype
-        # self.count = count
-        self.readArgs = readArgs
-        self.castArgs = castArgs
-
-        self.data = None
-        # self.success  = None
-
-        return
-
-    def run(self):
-        try:
-            readData = num.fromfile(self.img, **self.readArgs)
-            self.data = num.array(readData, **self.castArgs)
-            self.success = True
-        except:
-            self.success = False
-        return
-
 #
 # Module functions
 #
@@ -1109,3 +1010,9 @@ def newGenericReader(ncols, nrows, *args, **kwargs):
 
     return retval
 
+class ReaderDeprecationWarning(DeprecationWarning):
+    """Warnings on use of old reader features"""
+    def __init__(self, value):
+        self.value = value
+    def __str__(self):
+        return repr(self.value)
