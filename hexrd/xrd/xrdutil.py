@@ -294,11 +294,11 @@ def textureToSpots(texture,
         bMats = None
     rMats = rot.rotMatOfQuat(quats)
     #
-    spotAngs = makeSynthSpots(rMats, pVecs, bMats, 
+    spotAngs = makeSynthSpots(rMats, pVecs, bMats,
                               planeData, detectorGeom,
                               omeMM=omeMM,
                               etaMM=etaMM)
-    
+
     return spotAngs
 
 def makeSynthSpots(rMats, pVecs, bMats, planeData, detectorGeom,
@@ -315,14 +315,14 @@ def makeSynthSpots(rMats, pVecs, bMats, planeData, detectorGeom,
     nGrains = rMats.shape[0]
     assert rMats.shape[1] == 3 and rMats.shape[2] == 3,\
         'rMats is wrong shape'
-    
+
     'handle ome ranges'
     # min
     omeMin = num.atleast_1d(omeMM[0])
     for i in range(len(omeMin)):
         if hasattr(omeMin[i], 'getVal'):
             omeMin[i] = omeMin[i].getVal('radians')
-    
+
     # max
     omeMax = num.atleast_1d(omeMM[1])
     for i in range(len(omeMax)):
@@ -331,7 +331,7 @@ def makeSynthSpots(rMats, pVecs, bMats, planeData, detectorGeom,
 
     assert len(omeMin) == len(omeMax), \
            'oscillation angle ranges are not the same length'
-    
+
     'handle eta ranges'
     # min
     if etaMM is not None:
@@ -339,7 +339,7 @@ def makeSynthSpots(rMats, pVecs, bMats, planeData, detectorGeom,
         for i in range(len(etaMin)):
             if hasattr(etaMin[i], 'getVal'):
                 etaMin[i] = etaMin[i].getVal('radians')
-        
+
         # max
         etaMax = num.atleast_1d(etaMM[1])
         for i in range(len(etaMax)):
@@ -347,7 +347,7 @@ def makeSynthSpots(rMats, pVecs, bMats, planeData, detectorGeom,
                 etaMax[i] = etaMax[i].getVal('radians')
         assert len(etaMin) == len(etaMax), \
                'azimuthal angle ranges are not the same length'
-        
+
     spotAngs = []
     completeGrains = num.ones(nGrains, dtype='bool')
     for i in range(nGrains):
@@ -363,11 +363,11 @@ def makeSynthSpots(rMats, pVecs, bMats, planeData, detectorGeom,
         else:
             qVec, qAng0, qAng1 = \
                 planeData.makeTheseScatteringVectors(hklList, rMats[i, :, :], bMat=bMat, chiTilt=chiTilt)
-    
+
         # filter using ome ranges
         validAng0 = validateQVecAngles(qAng0[2, :], omeMin, omeMax)
         validAng1 = validateQVecAngles(qAng1[2, :], omeMin, omeMax)
-        
+
         # now eta (if applicable)
         if etaMM is not None:
             validAng0 = num.logical_and( validAng0, validateQVecAngles(qAng0[1, :], etaMin, etaMax) )
@@ -382,10 +382,10 @@ def makeSynthSpots(rMats, pVecs, bMats, planeData, detectorGeom,
                                          num.logical_and(jCol0 >= 0, jCol0 <= detectorGeom.ncols))
             inCorners1 = num.logical_and(num.logical_and(iRow1 >= 0, iRow1 <= detectorGeom.nrows),
                                          num.logical_and(jCol1 >= 0, jCol1 <= detectorGeom.ncols))
-            
+
             validAng0 = num.logical_and( validAng0, inCorners0 )
             validAng1 = num.logical_and( validAng1, inCorners1 )
-        
+
         # validAng0 = num.zeros(qVec.shape[1], dtype='bool')
         # validAng1 = num.zeros(qVec.shape[1], dtype='bool')
         # for j in range(len(omeMin)):
@@ -393,9 +393,9 @@ def makeSynthSpots(rMats, pVecs, bMats, planeData, detectorGeom,
         #         ( qAng0[2, :] >= omeMin[j] ) & ( qAng0[2, :] <= omeMax[j] ) )
         #     validAng1 = validAng1 | (
         #         ( qAng1[2, :] >= omeMin[j] ) & ( qAng1[2, :] <= omeMax[j] ) )
-        
+
         tmpAngs = num.hstack([qAng0[:, validAng0], qAng1[:, validAng1]])
-    
+
         if pVecs is not None:
             tmpDG = detectorGeom.makeNew(pVec=pVecs[i, :])
 
@@ -1160,9 +1160,9 @@ class OmeEtaPfig(object):
         for p in self.pList:
             p.destroy()
         self.pList = []
-        
+
         self.__nP_cur = nP
-        
+
         if self.doRot is True:
             'rotate to get "x" into "z" so that projection along 3 direction works well'
             rMat = rMat_y90
@@ -1724,79 +1724,6 @@ def makeMeasuredScatteringVectors(tTh, eta, ome, convention='hexrd', frame='samp
 #
 # fun with multiprocessing
 
-reader_MP = None
-func_MP = None
-nPerChunk_MP = None
-debug_MP = True
-def doItMP(nSkip):
-    location = '  doItMP'
-
-    global reader_MP, func_MP, debug_MP
-    print 'in doItMP, nPerChunk nSkip : %g %g' % (nPerChunk_MP, nSkip)
-    tic = time.time()
-    readerLocal = reader_MP.makeNew()
-    toc = time.time(); dt = toc - tic; tic = toc
-    print location+' : %g seconds to make new reader' % (dt)
-    retval = []
-    nLocalFrame = min(nPerChunk_MP, readerLocal.getNFrames()-nSkip)
-    for iLocalFrame in range(nLocalFrame):
-        frame = readerLocal.read(nskip=nSkip)
-        toc = time.time(); dt = toc - tic; tic = toc
-        print location+' : %g seconds to read frame' % (dt)
-        retval.append(func_MP(frame))
-        toc = time.time(); dt = toc - tic; tic = toc
-        print location+' : %g seconds to process frame' % (dt)
-        nSkip = 0 # only need to skip for first read
-    return retval
-def readFrameStack_multiproc(reader, func, nPerChunk=None, nCPUs=None, debug=False):
-    """
-    read the full frame stack using multiprocessing, applying fund
-    to each frame to obtain the result;
-
-    use makeNew for each chunk; if reader.dark is a shared memory
-    array then it remains so
-    """
-    assert xrdbase.haveMultiProc, \
-        'do not have multiprocessing available'
-
-    nFrames = reader.getNFrames()
-    nCPUs = nCPUs or xrdbase.dfltNCPU
-    nPerChunk = nPerChunk or max(int(nFrames/(4*nCPUs)),1)
-
-    global reader_MP, func_MP, nPerChunk_MP, debug_MP
-    reader_MP = reader
-    func_MP = func
-    nPerChunk_MP = nPerChunk
-    debug_MP = debug
-    'if reader has a dark frame, make sure it is in shared memory'
-    if reader.dark is not None:
-        #dark_temp  = detector.ReadGE.readDark(fileInfo[0][0], nframes=fileInfo[0][1])
-        dark_temp   = reader.dark
-        dark_shmem  = multiprocessing.RawArray(ctypes.c_double, dark_temp.size)
-        dark        = num.frombuffer(dark_shmem, dtype=num.float64, count=dark_temp.size)
-        dark.shape  = dark_temp.shape
-        dark[:,:]   = dark_temp[:,:]
-        reader.dark = dark
-        del dark_temp
-
-    nSkipList = range(0,nFrames,nPerChunk)
-
-    pool = multiprocessing.Pool(nCPUs)
-
-    if debug:
-        print 'nSkipList : '+str(nSkipList)
-    tic = time.time(); results_chunked = pool.map(doItMP, nSkipList, chunksize=1); toc = time.time()
-    dt = toc - tic
-    print 'elapsed time running under multiprocessing pool : %g' % (dt)
-    results = reduce(lambda x,y: x+y, results_chunked, [])
-
-    pool.close()
-
-    reader_MP = None
-    func_MP = None
-    nPerChunk_MP = None
-    return results
-
 def thresholdStackDisplay(data, threshold, cmap=None, pw=None,
                           detectorGeom=None, planeData=None,
                           displayKWArgs={}, drawRingsKWArgs={}
@@ -2133,23 +2060,23 @@ def pullFromStack(reader, detectorGeom, tThMM, angWidth, angCen,
 
     return iSpot, labels, objs, pixelData, xyfBBox
 
-def grainSpotsFromStack(g, 
+def grainSpotsFromStack(g,
                         reader, detectorGeom, angWidth, threshold,
                         **kwargs):
     """
-    wrapper around spotFromStack; takes a grain and 
-    returns a dictionary of spots for the grain, with 
+    wrapper around spotFromStack; takes a grain and
+    returns a dictionary of spots for the grain, with
     keys (hklID, iThisHKL)
-    
-    angWidth is for orientation spread; for 2-theta, g.planeData 
-    2-theta ranges are used 
-    
+
+    angWidth is for orientation spread; for 2-theta, g.planeData
+    2-theta ranges are used
+
     can specify hklIDs to look for just a subset of spots
-    
+
     set distInAng=False if want the spots to have to contain the predicted angles,
     otherwise, the closest spots in the bounding boxes will be returned
     """
-    
+
     fout   = kwargs.pop('fout', sys.stdout)
     hklIDs = kwargs.pop('hklIDs', num.arange(len(g.planeData.getHKLs())))
     #
@@ -2161,7 +2088,7 @@ def grainSpotsFromStack(g,
     kwargs.setdefault('distInAng',True)
 
     deltaOmega = reader.getDeltaOmega()
-    
+
     retval = {}
     #
     for hklID in hklIDs:
@@ -2172,15 +2099,15 @@ def grainSpotsFromStack(g,
                 if debug: print >> fout, 'spot %d for hklID %d has its center off the detector, skipping' % (iThisHKL, hklID)
                 continue
             key = (hklID, iThisHKL)
-            
+
             spotData = spotFromStack(reader, detectorGeom, tThMM, angWidth, predAngs, threshold, **kwargs)
-            
+
             if spotData is None:
                 if debug: print >> fout, 'spot %d for hklID %d got no data from spotFromStack' % (iThisHKL, hklID)
             else:
                 retval[key] = spotfinder.Spot(key, deltaOmega, spotData, detectorGeom=detectorGeom)
                 if debug: print >> fout, 'made spot %d for hklID %d' % (iThisHKL, hklID)
-    
+
     return retval
 
 def spotFromStack(reader, detectorGeom, tThMM, angWidth, angCen, threshold,
@@ -2631,24 +2558,24 @@ def pfigFromSpots(spots, iHKL, phaseID=None,
             print >> sys.stderr, "WARNING: do not have pfigPkg, returned results are incomplete"
         retval.append( (
                 pfigDict,
-                omeEdges, 
-                etaEdges, 
+                omeEdges,
+                etaEdges,
                 intensVals,
                 ) )
 
         return retval
 
-def makeSynthFrames(spotParamsList, detectorGeom, omegas, 
-                    intensityFunc=spotfinder.IntensityFuncGauss3D(), 
-                    asSparse=None, 
-                    output=None, 
-                    cutoffMult=4.0, 
+def makeSynthFrames(spotParamsList, detectorGeom, omegas,
+                    intensityFunc=spotfinder.IntensityFuncGauss3D(),
+                    asSparse=None,
+                    output=None,
+                    cutoffMult=4.0,
                     debug=1,
                     ):
     """
     intensityFunc is an instance of a class that works as an intensity
     fuction.
-    
+
     spotParamsList should be a list with each entry being a list of
     arguments appropriate to the intensityFunc.constructParams
     function. For intensityFunc=spotfinder.IntensityFuncGauss3D(),
@@ -2656,31 +2583,31 @@ def makeSynthFrames(spotParamsList, detectorGeom, omegas,
     being the 3D spot center in angular coordinates (radians), fwhm
     being the (2-theta, eta, omega) widths in 3D, and A being an
     intensity scaling.
-    
+
     If output is specified as a string, then the frames with the given
     prefix are dumped to files instead of being accumulated in
     memory. If output is callable then frames are passed to output().
-    
+
     If asSparse is true then sparse matrices are used to reduce memory
     footprint. The asSparse option is currently not coded for the case
     of output having been specied.
-    
+
     cutoffMult is the multiplier on the FWHM to determine the angular
     cutoff range for evaluating intensity for each spot.
     """
-    
+
     nFrames = len(omegas)
-    
+
     'might eventually want to add a check for constant delta-omega'
     omegaDelta = num.mean(omegas[1:]-omegas[:-1])
-    
+
     # nParams = intensityFunc.getNParams(noBkg=False) # not needed
-    
+
     spotList = []
     #
     for iSpot, spotParams in enumerate(spotParamsList):
         xVec = intensityFunc.constructParams(*spotParams)
-    
+
         'bbox from center and widths'
         'do not worry about excessive pixel coverage for spots at eta around 45 degrees and the like?'
         angCen = intensityFunc.getCenter(xVec)
@@ -2689,7 +2616,7 @@ def makeSynthFrames(spotParamsList, detectorGeom, omegas,
         xyfBBox = detectorGeom.angToXYOBBox(angCen, angPM, units='pixels', omegas=omegas)
         # xyfBBox_0 = num.array([sl[0] for sl in xyfBBox])
         # stack[slice(*xyfBBox[0]), slice(*xyfBBox[1]), slice(*xyfBBox[2])]
-        
+
         'make spot instance, set up for just a single omega frame slice'
         xM, yM = num.meshgrid(num.arange(*xyfBBox[0]), num.arange(*xyfBBox[1]))
         xAll = xM.flatten(); yAll = yM.flatten();
@@ -2708,7 +2635,7 @@ def makeSynthFrames(spotParamsList, detectorGeom, omegas,
     if debug: print 'created %d spots'%(len(spotList))
 
     if asSparse is None:
-        asSparse = output is None 
+        asSparse = output is None
 
     if output is None:
         if asSparse:
@@ -2722,7 +2649,7 @@ def makeSynthFrames(spotParamsList, detectorGeom, omegas,
         stack = None
     #
     for iFrame, omega in enumerate(omegas):
-        
+
         if output is None:
             if asSparse:
                 vThese = []
@@ -2732,19 +2659,19 @@ def makeSynthFrames(spotParamsList, detectorGeom, omegas,
                 frame = stack[iFrame,:,:]
         else:
             frame = detectorGeom.frame()
-        
+
         for spot, xyfBBox, xVec in spotList:
-            
+
             if iFrame < xyfBBox[2][0] or iFrame >= xyfBBox[2][1]:
                 '>= for upper end because is meant to be used as a slice'
                 if debug>2: print 'spot %s not on frame %d' % (spot.key, iFrame)
                 continue
-            
+
             'calculate intensities at the omega for this frame'
             spot.oAll[:] = omega
-            vCalc = spot.getVCalc(intensityFunc, xVec, noBkg=True) 
+            vCalc = spot.getVCalc(intensityFunc, xVec, noBkg=True)
             if debug>1:print 'frame %d spot %s max %g' % ( iFrame, spot.key, vCalc.max() )
-            
+
             'put intensity on frames'
             if asSparse:
                 vThese.append(vCalc)
@@ -2753,7 +2680,7 @@ def makeSynthFrames(spotParamsList, detectorGeom, omegas,
             else:
                 frame[spot.xAll, spot.yAll] += vCalc
         'done with spot loop'
-        
+
         if output is None:
             if asSparse:
                 if len(vThese) > 0:
@@ -2761,7 +2688,7 @@ def makeSynthFrames(spotParamsList, detectorGeom, omegas,
                     xThese = num.hstack(xThese)
                     yThese = num.hstack(yThese)
                     if debug>1: print 'frame %d will have up to %d nonzeros' % (iFrame,len(vThese))
-                    frame = sparse.coo_matrix( ( vThese , (xThese,yThese) ) , 
+                    frame = sparse.coo_matrix( ( vThese , (xThese,yThese) ) ,
                                                shape=(detectorGeom.nrows, detectorGeom.ncols) )
                     frame = frame.tocsr() # note that coo->csr sums entries as desired for overlapped spots
                 else:
@@ -2779,20 +2706,20 @@ def makeSynthFrames(spotParamsList, detectorGeom, omegas,
                 output(frame)
             else:
                 raise RuntimeError, 'do not know what to do with output of type %s' % (type(output))
-            
-    
+
+
         if debug: print 'created frame %d'%(iFrame)
-    
+
     'done with loop over frames'
-        
+
     return stack # may be None
 
 def validateQVecAngles(angList, angMin, angMax):
     angList = num.atleast_1d(angList)   # needs to have 'shape'
-    
+
     angMin = num.atleast_1d(angMin)    # need to have len
     angMax = num.atleast_1d(angMax)    # need to have len
-    
+
     assert len(angMin) == len(angMax), "length of min and max angular limits must match!"
 
     reflInRange = num.zeros(angList.shape, dtype=bool)
