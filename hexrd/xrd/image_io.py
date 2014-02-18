@@ -30,6 +30,10 @@ import numpy as num
 
 warnings.filterwarnings('always', '', DeprecationWarning)
 
+class OmegaFrameReader(object)
+    """Facade for frame_series class, replacing other readers, primarily ReadGE"""
+    pass
+
 class Framer2DRC(object):
     """Base class for readers.
 
@@ -132,59 +136,6 @@ class Framer2DRC(object):
             retval = num.ma.masked_array(retval, mask, hard_mask=True, copy=False)
         return retval
 
-    @classmethod
-    def display(cls,
-                thisframe,
-                roi = None,
-                pw  = None,
-                **kwargs
-                ):
-        warnings.warn('display method on readers no longer implemented',
-                      ReaderDeprecationWarning)
-
-    @classmethod
-    def getDisplayArgs(cls, dROI, kwargs):
-        range     = kwargs.pop('range',None)
-        cmap      = kwargs.pop('cmap',None)
-        dtypeRead = kwargs.pop('dtypeRead','uint16')
-
-        roiMin = dROI.min()
-        roiMax = dROI.max()
-        #
-        centered = getCentered(roiMin, roiMax)
-        if dROI.dtype == 'bool' and range is None:
-            centered = False
-            vmin = 0
-            vmax = 1
-        elif dROI.dtype == 'float64' and \
-                centered and \
-                range is None:
-            range = 2.0*num.max(num.abs(dROI))
-            thr   = 0.0
-            vmin = thr-range/2
-            vmax = thr+range/2
-        else:
-            centered = False
-            vmin, vmax = cls.getVMM(dROI, range=range, dtypeRead=dtypeRead)
-        #
-        if cmap is None:
-            cmap = getCMap(centered)
-
-        return vmin, vmax, cmap
-
-    @classmethod
-    def getVMM(cls, dROI, range=None, dtypeRead='uint16'):
-        if range is None:
-            range = 200.
-        if hasattr(range,'__len__'):
-            assert len(range) == 2, 'wrong length for value range'
-            vmin = range[0]
-            vmax = range[1]
-        else:
-            thr    = dROI.mean()
-            vmin = max(0,            thr-range/2) # max(dROI.min(), thr-range/2)
-            vmax = min(cls.maxVal(dtypeRead), thr+range/2)
-        return vmin, vmax
 
 class FrameWriter(Framer2DRC):
     def __init__(self, *args, **kwargs):
@@ -457,8 +408,16 @@ class ReadGeneric(Framer2DRC):
                           nbytesHeader=self.__nbytes_header)
         return new
 
-class ReadGE(Framer2DRC):
-    """
+class ReadGE(object):
+    """General reader for omega scans
+
+    Originally, this was for reading GE format images, but this is now
+    a general reader accessing the OmegaFrameReader facade class. The main
+    functionality to read a sequence of images with associated omega ranges.
+
+
+    ORIGINAL DOCS
+    =============
     Read in raw GE files; this is the class version of the foregoing functions
 
     NOTES
@@ -481,78 +440,12 @@ class ReadGE(Framer2DRC):
        If there are multiple empty frames, the average is used.
 
     """
-    """
-    It is likely that some of the methods here should be moved up to a base class
-    """
-    __nbytes_header    = 8192
-    __idim             = 2048
-    __nrows = __idim
-    __ncols = __idim
-    __frame_dtype_dflt = 'int16' # good for doing subtractions
-    __frame_dtype_read = 'uint16'
-    __frame_dtype_float = 'float64'
-    __nbytes_frame     = num.nbytes[num.uint16]*__nrows*__ncols # = 2*__nrows*__ncols
-    __debug = False
-    __location = '  ReadGE'
-    __readArgs = {
-        'dtype' : __frame_dtype_read,
-        'count' : __nrows*__ncols
-        }
-    __castArgs = {
-        'dtype' : __frame_dtype_dflt
-        }
-    __inParmDict = {
-        'omegaStart':None,
-        'omegaDelta':None,
-        'subtractDark':False,
-        'mask':None,
-        'useMask':None,
-        'dark':None,
-        'dead':None,
-        'nDarkFrames':1,
-        'doFlip':True,
-        'flipArg':'v',
-        }
-    # 'readHeader':False
-    def __init__(self,
-                 fileInfo,
-                 *args,
-                 **kwargs):
+    def __init__(self, file_info, *args, **kwargs):
+        """Initialize the reader
+
+        *file_info* a dictionary providing file and format specifications
         """
-        meant for reading a series of frames from an omega sweep, with fixed delta-omega
-        for each frame
-
-        omegaStart and omegaDelta can follow fileInfo or be specified in whatever order by keyword
-
-        fileInfo: string, (string, nempty), or list of (string, nempty) for multiple files
-
-        for multiple files and no dark, dark is formed only from empty
-        frames in the first file
-        """
-
-        Framer2DRC.__init__(self,
-                            self.__nrows, self.__ncols,
-                            dtypeDefault = self.__frame_dtype_dflt,
-                            dtypeRead    = self.__frame_dtype_read,
-                            dtypeFloat   = self.__frame_dtype_float,
-                            )
-
-        # defaults
-        self.__kwPassed = {}
-        for parm, val in self.__inParmDict.iteritems():
-            self.__kwPassed[parm] = kwargs.has_key(parm)
-            if kwargs.has_key(parm):
-                val = kwargs.pop(parm)
-            self.__setattr__(parm, val)
-        if len(kwargs) > 0:
-            raise RuntimeError, 'unparsed keyword arguments: '+str(kwargs.keys())
-        if len(args) == 0:
-            pass
-        elif len(args) == 2:
-            self.omegaStart = args[0]
-            self.omegaDelta = args[1]
-        else:
-            raise RuntimeError, 'do not know what to do with args : '+str(args)
+        self._ofr = OmegaFrameReader(file_info)  # todo: clarify this
 
         # initialization
         self.omegas = None
@@ -563,22 +456,6 @@ class ReadGE(Framer2DRC):
         self.nFramesRemain = None # remaining in current file
         self.iFrame = -1 # counter for last global frame that was read
 
-        if self.dark is not None:
-            if not self.__kwPassed['subtractDark']:
-                'subtractDark was not explicitly passed, set it True'
-                self.subtractDark = True
-            if isinstance(self.dark, str):
-                darkFile = self.dark
-                self.dark = ReadGE.readDark(darkFile, nframes=self.nDarkFrames)
-            elif isinstance(self.dark, num.ndarray):
-                assert self.dark.size == self.__nrows * self.__ncols, \
-                    'self.dark wrong size'
-                self.dark.shape = (self.__nrows, self.__ncols)
-                if self.dark.dtype.name == self.__frame_dtype_read:
-                    'protect against unsigned-badness when subtracting'
-                    self.dark = self.dark.astype(self.__frame_dtype_dflt)
-            else:
-                raise RuntimeError, 'do not know what to do with dark of type : '+str(type(self.dark))
 
         if fileInfo is not None:
             self.__setupRead(fileInfo, self.subtractDark, self.mask, self.omegaStart, self.omegaDelta)
@@ -596,16 +473,10 @@ class ReadGE(Framer2DRC):
         warnings.warn('display method on readers no longer implemented',
                       ReaderDeprecationWarning)
 
-    @classmethod
-    def readDark(cls, darkFile, nframes=1):
-        'dark subtraction is done before flipping, so do not flip when reading either'
-        darkReader = ReadGE(darkFile, doFlip=False)
-        dark = darkReader.read(nframes=nframes, sumImg=True).astype(cls.__frame_dtype_dflt)
-        darkReader.close()
-        return dark
     def makeNew(self):
         """return a clean instance for the same data files
         useful if want to start reading from the beginning"""
+        # Might need this
         inParmDict = {}
         inParmDict.update(self.__inParmDict)
         for key in self.__inParmDict.keys():
