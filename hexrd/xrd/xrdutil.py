@@ -1722,30 +1722,7 @@ def makeMeasuredScatteringVectors(tTh, eta, ome, convention='hexrd', frame='samp
 
 ######################################################################
 #
-# fun with multiprocessing
 
-def thresholdStackDisplay(data, threshold, cmap=None, pw=None,
-                          detectorGeom=None, planeData=None,
-                          displayKWArgs={}, drawRingsKWArgs={}
-                          ):
-    '''
-    passes sumImg=num.maximum to dataToFrame so that if data is a
-    reader then frame ends up being the maximum over the image stack
-    '''
-    thisframe = dataToFrame(data, sumImg=num.maximum)
-    if cmap is None:
-        cmap = cm.bone
-        cmap.set_over('red')
-    if detectorGeom is None:
-        retval = detector.Framer2DRC.display(
-            thisframe, cmap=cmap, range=(0,threshold), pw=pw,
-            **displayKWArgs)
-    else:
-        retval = detectorGeom.display(
-            thisframe, planeData=planeData, cmap=cmap, range=(0,threshold), pw=pw,
-            **displayKWArgs)
-        detectorGeom.drawRings(retval, planeData, **drawRingsKWArgs)
-    return retval
 
 class GrainPoles:
     def __init__(self, omeEtaPfigs):
