@@ -47,7 +47,7 @@ class OmegaFrameReader(object):
 
         return
 
-    # property:  nframes
+    # property:  nframeshttps://bugzilla.redhat.com/show_bug.cgi?id=921792
 
     @property
     def nframes(self):
@@ -58,15 +58,11 @@ class OmegaFrameReader(object):
 
 class Framer2DRC(object):
     """Base class for readers.
-
-    You can make an instance of this class and use it for most of the
-    things a reader would do, other than actually reading frames
     """
-    def __init__(self,
-                 ncols, nrows,
+    def __init__(self, ncols, nrows,
                  dtypeDefault='int16', dtypeRead='uint16', dtypeFloat='float64'):
-        self.__ncols = ncols
         self.__nrows = nrows
+        self.__ncols = ncols
         self.__frame_dtype_dflt  = dtypeDefault
         self.__frame_dtype_read  = dtypeRead
         self.__frame_dtype_float = dtypeFloat
@@ -74,6 +70,10 @@ class Framer2DRC(object):
         self.__nbytes_frame  = num.nbytes[dtypeRead]*nrows*ncols
 
         return
+
+    def get_nrows(self):
+        return self.__nrows
+    nrows = property(get_nrows, None, None)
 
     def get_ncols(self):
         return self.__ncols
@@ -83,41 +83,17 @@ class Framer2DRC(object):
         return self.__nbytes_frame
     nbytesFrame = property(get_nbytesFrame, None, None)
 
-    def get_nrows(self):
-        return self.__nrows
-    nrows = property(get_nrows, None, None)
-
     def get_dtypeDefault(self):
         return self.__frame_dtype_dflt
     dtypeDefault = property(get_dtypeDefault, None, None)
+
     def get_dtypeRead(self):
         return self.__frame_dtype_read
     dtypeRead = property(get_dtypeRead, None, None)
+
     def get_dtypeFloat(self):
         return self.__frame_dtype_float
     dtypeFloat = property(get_dtypeFloat, None, None)
-
-    def getOmegaMinMax(self):
-        raise NotImplementedError
-    def getDeltaOmega(self):
-        'needed in findSpotsOmegaStack'
-        raise NotImplementedError
-    def getNFrames(self):
-        """
-        number of total frames with real data, not number remaining
-        needed in findSpotsOmegaStack
-        """
-        raise NotImplementedError
-    def read(self, nskip=0, nframes=1, sumImg=False):
-        'needed in findSpotsOmegaStack'
-        raise NotImplementedError
-    def getDark(self):
-        'needed in findSpotsOmegaStack'
-        raise NotImplementedError
-    def getFrameOmega(self, iFrame=None):
-        'needed in findSpotsOmegaStack'
-        raise NotImplementedError
-
 
     @classmethod
     def maxVal(cls, dtypeRead):
