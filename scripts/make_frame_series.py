@@ -87,9 +87,12 @@ def image_info(a):
 def describe_imgs(a):
     print 'image files are: ', a.imagefiles
     im0 = fabio.open(a.imagefiles[0])
-    print 'First file is of fabio class: %s' % im0.__class__
-    print 'Dimensions are: %d X %d' % (im0.dim1, im0.dim2)
-    print 'number of frames: %d' % im0.nframes
+    print 'Total number of files: %d' % len(a.imagefiles)
+    print 'First file: %s' % a.imagefiles[0]
+    print '... fabio class: %s' % im0.__class__
+    print '... number of frames: %d' % im0.nframes
+    print '... image dimensions: %d X %d' % (im0.dim1, im0.dim2)
+    print '... image data type: %s' % im0.data.dtype
 
     pass
 
@@ -111,10 +114,12 @@ def set_options():
     parser.add_argument("--empty", "--blank",
                         help="number of blank frames in beginning of file",
                         metavar="N", type=int, action="store", default=0)
+    # these two not yet implemented
     parser.add_argument("--dark-from-empty",
                         help="use empty frames to build dark image",
                         action="store_true")
     parser.add_argument("--dark-file", help="name of file containing dark image")
+
     parser.add_argument("imagefiles", nargs="+", help="image files")
 
     return parser

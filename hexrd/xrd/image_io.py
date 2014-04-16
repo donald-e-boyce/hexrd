@@ -28,10 +28,39 @@ import warnings
 
 import numpy as num
 
+from frame_series import load_series
+
 warnings.filterwarnings('always', '', DeprecationWarning)
 
-class OmegaFrameReader(object)
+class OmegaFrameReader(object):
     """Facade for frame_series class, replacing other readers, primarily ReadGE"""
+
+    def __init__(self, fileinfo):
+        """Initialize frame reader
+
+        *fileinfo* is a dictionary including keys for "format" and "filename";
+                      other keys depend on the format and will be passed on
+        """
+        if isinstance(fileinfo, dict):
+            if "format" not in fileinfo or "filename" not in fileinfo:
+                raise RuntimeError('Could not find "name" or "path" in fileinfo.')
+        else:
+            raise RuntimeError('Old style fileinfo no longer in use.')
+
+        fmt = fileinfo.pop('format')
+        fname = fileinfo.pop('filename')
+
+        self.frame_series = load_series(fname, fmt, fileinfo)
+
+        return
+
+    # property:  nframes
+
+    @property
+    def nframes(self):
+        """(get-only) Number of available data frames"""
+        return len(self.frame_series)
+
     pass
 
 class Framer2DRC(object):
@@ -534,6 +563,7 @@ class ReadGE(object):
         self.__nextFile()
 
         return
+
     def getNFrames(self):
         """number of total frames with real data, not number remaining"""
         nFramesTot = self.getNFramesFromFileInfo(self.fileInfo)
