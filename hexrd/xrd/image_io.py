@@ -3,7 +3,6 @@
 Classes
 -------
 Framer2DRC: base class for reader/writers
-FrameWriter: simple image writer
 ReadGeneric:
 ReadGE:
 
@@ -13,12 +12,6 @@ Functions
 ---------
 getNFramesFromBytes - reader function from original detector module
 newGenericReader - returns a reader instance
-
-Remember
---------
-Fix bug in FrameWriter: duplicated line
-    self.__nempty        = kwargs.pop('nempty', 0)
-
 
 """
 import copy
@@ -166,63 +159,6 @@ class Framer2DRC(object):
         return retval
 
 
-class FrameWriter(Framer2DRC):
-    def __init__(self, *args, **kwargs):
-        self.filename        = kwargs.pop('filename')
-        self.__nbytes_header = kwargs.pop('nbytesHeader', 0)
-        self.__nempty        = kwargs.pop('nempty', 0)
-        self.__nempty        = kwargs.pop('nempty', 0)
-
-        Framer2DRC.__init__(self, *args, **kwargs)
-
-        self.nFrame = 0
-        self.img = open(self.filename, mode='wb')
-
-        # skip header for now
-        self.img.seek(self.__nbytes_header, 0)
-        if self.__nempty > 0:
-            self.img.seek(self.nbytesFrame*self.__nempty, 1)
-
-        return
-    def write(self, data, doAllChecks=True):
-
-        # if nskip > 0:
-        #     self.img.seek(self.__nbytes_frame*nskip, 1)
-
-        assert len(data.shape) == 2, 'data is not 2D'
-        assert data.shape[0] == self.nrows, 'number of rows is wrong'
-        assert data.shape[1] == self.ncols, 'number of rows is wrong'
-
-        intType = False
-
-        if   num.result_type(self.dtypeRead).kind == 'u':
-            intType = True
-            if data.dtype.kind == 'u':
-                'all set'
-            else:
-                if num.any(data < 0):
-                    raise RuntimeError, 'trying to write negative data to unsigned type'
-                data = data.astype(self.dtypeRead)
-        elif num.result_type(self.dtypeRead).kind == 'i':
-            intType = True
-            data = data.astype(self.dtypeRead)
-        else:
-            data = data.astype(self.dtypeRead)
-
-        if doAllChecks and intType:
-            dataMax = data.max()
-            readMax = num.iinfo(self.dtypeRead).max
-            if dataMax > readMax :
-                raise RuntimeError, 'max of %g greater than supported value of %g' % (dataMax, readMax)
-
-        data.tofile(self.img)
-
-        return
-    def __call__(self, *args, **kwargs):
-        return self.write(*args, **kwargs)
-    def close(self):
-        self.img.close()
-        return
 
 class ReadGeneric(Framer2DRC):
     '''
@@ -427,15 +363,7 @@ class ReadGeneric(Framer2DRC):
 
 
     def getWriter(self, filename):
-        # if not self.doFlip is False:
-        #     raise NotImplementedError, 'doFlip true not coded'
-        new = FrameWriter(self.ncols, self.nrows,
-                          filename=filename,
-                          dtypeDefault=self.dtypeDefault,
-                          dtypeRead=self.dtypeRead,
-                          dtypeFloat=self.dtypeFloat,
-                          nbytesHeader=self.__nbytes_header)
-        return new
+        return None
 
 class ReadGE(object):
     """General reader for omega scans
@@ -521,15 +449,7 @@ class ReadGE(object):
     nbytesHeader = property(get_nbytes_header, None, None)
 
     def getWriter(self, filename):
-        if not self.doFlip is False:
-            raise NotImplementedError, 'doFlip true not coded'
-        new = FrameWriter(self.ncols, self.nrows,
-                          filename=filename,
-                          dtypeDefault=self.dtypeDefault,
-                          dtypeRead=self.dtypeRead,
-                          dtypeFloat=self.dtypeFloat,
-                          nbytesHeader=self.nbytesHeader)
-        return new
+        return None
 
     def __setupRead(self, fileInfo, subtractDark, mask, omegaStart, omegaDelta):
 
@@ -886,7 +806,8 @@ class ReadGE(object):
 #
 def omeToFrameRange(omega, omegas, omegaDelta):
     """
-    check omega range for the frames instead of omega center;
+    check omega range for the frames in
+    stead of omega center;
     result can be a pair of frames if the specified omega is
     exactly on the border
     """

@@ -47,7 +47,7 @@ from matplotlib import cm, colors
 from matplotlib import mlab
 from matplotlib.widgets import Slider, Button, RadioButtons
 
-from .image_io import Framer2DRC, FrameWriter, ReadGeneric, ReadGE,\
+from .image_io import Framer2DRC, ReadGeneric, ReadGE,\
      ReaderDeprecationWarning
 from .xrdbase import getGaussNDParams, dataToFrame
 from .crystallography import processWavelength
