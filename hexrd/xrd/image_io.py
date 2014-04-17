@@ -29,7 +29,7 @@ class OmegaFrameReader(object):
     """Facade for frame_series class, replacing other readers, primarily ReadGE"""
 
     def __init__(self, fileinfo):
-        """Initialize frame reader
+        """Initialize frame readerOmegaFrameReader
 
         *fileinfo* is a dictionary including keys for "format" and "filename";
                       other keys depend on the format and will be passed on
@@ -110,10 +110,6 @@ class Framer2DRC(object):
         mask = num.zeros([self.nrows, self.ncols], dtype=bool)
         return mask
 
-    def getSize(self):
-        retval = (self.nrows, self.ncols)
-        return retval
-
     def frame(self, nframes=None, dtype=None, buffer=None, mask=None):
         if buffer is not None and dtype is None:
             if hasattr(buffer,'dtype'):
@@ -134,14 +130,10 @@ class Framer2DRC(object):
             retval = num.ma.masked_array(retval, mask, hard_mask=True, copy=False)
         return retval
 
-
-
 class ReadGeneric(Framer2DRC):
-    '''
-    may eventually want ReadGE to inherit from this, or pull common things
-    off to a base class
-    '''
-    def __init__(self, filename, ncols, nrows, *args, **kwargs):
+    """Generic reader with omega information
+"""
+        def __init__(self, filename, ncols, nrows, *args, **kwargs):
         self.filename        = filename
         self.__nbytes_header = kwargs.pop('nbytes_header', 0)
         self.__nempty        = kwargs.pop('nempty', 0)
@@ -203,23 +195,7 @@ class ReadGeneric(Framer2DRC):
 
     def getFrameUseMask(self):
         return False
-    def __flip(self, thisframe):
-        return thisframe
 
-    '''
-    def read(self, nskip=0, nframes=1, sumImg=False):
-
-        if not nframes == 1:
-            raise NotImplementedError, 'nframes != 1'
-        if not sumImg == False:
-            raise NotImplementedError, 'sumImg != False'
-
-        data = self.__readNext(nskip=nskip)
-
-        self.iFrame += nskip + 1
-
-        return data
-    '''
     def read(self, nskip=0, nframes=1, sumImg=False):
         """
         sumImg can be set to True or to something like numpy.maximum
@@ -264,9 +240,6 @@ class ReadGeneric(Framer2DRC):
             else:
                 thisframe = self.frame(buffer=data,
                                        mask=self.dead)
-
-            # flipping
-            thisframe = self.__flip(thisframe)
 
             # masking (True get zeroed)
             if self.mask is not None:
@@ -434,10 +407,7 @@ class ReadGE(object):
         self.fileListR.reverse() # so that pop reads in order
 
         self.subtractDark = subtractDark
-        self.mask         = mask
-
-        if self.dead is not None:
-            self.deadFlipped = self.__flip(self.dead)
+        self.mask = mask
 
         assert (omegaStart is None) == (omegaDelta is None),\
             'must provide either both or neither of omega start and delta'
@@ -610,25 +580,11 @@ class ReadGE(object):
             nskip = 0
             retval[:,:,iFrame] = copy.deepcopy(thisframe[sl_i, sl_j])
         if not raw and self.dead is not None:
-            'careful: have already flipped, so need deadFlipped instead of dead here'
-            mask = num.tile(self.deadFlipped[sl_i, sl_j].T, (retval.shape[2],1,1)).T
+            # used to be self.deadFlipped, but flipping now assumed done before loading
+            mask = num.tile(self.dead[sl_i, sl_j].T, (retval.shape[2],1,1)).T
             retval = num.ma.masked_array(retval, mask, hard_mask=True, copy=False)
         return retval
-    def __flip(self, thisframe):
-        if self.doFlip:
-            if self.flipArg == 'v':
-                thisframe = thisframe[:, ::-1]
-            elif self.flipArg == 'h':
-                thisframe = thisframe[::-1, :]
-            elif self.flipArg == 'vh' or self.flipArg == 'hv':
-                thisframe = thisframe[::-1, ::-1]
-            elif self.flipArg == 'cw90':
-                thisframe = thisframe.T[:, ::-1]
-            elif self.flipArg == 'ccw90':
-                thisframe = thisframe.T[::-1, :]
-            else:
-                raise RuntimeError, "unrecognized flip token."
-        return thisframe
+
     def getDark(self):
         if self.dark is None:
             retval = 0
@@ -676,9 +632,6 @@ class ReadGE(object):
             else:
                 thisframe = self.frame(buffer=data,
                                        mask=self.dead)
-
-            # flipping
-            thisframe = self.__flip(thisframe)
 
             # masking (True get zeroed)
             if self.mask is not None:
