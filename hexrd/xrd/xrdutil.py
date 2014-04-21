@@ -1423,8 +1423,6 @@ class CollapseOmeEta(object):
 
         'set up data'
         twoTheta, eta = detectorGeom.xyoToAngAll()
-        # omegaMin, omegaMax = detector.getOmegaMMReaderoList(readerList, overall=True) # retain information about omega range of each reader
-        # omegaMM = detector.getOmegaMMReaderList(self.readerList) # can use this is need to know omega ranges for each reader
 
         'the following need to be consistent'
         etaDelta      = 2.*num.pi/nEtaBins

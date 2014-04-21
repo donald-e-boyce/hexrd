@@ -4219,18 +4219,6 @@ class DetectorGeomQuadGE(DetectorBase):
         self.setQuadOffsets(iRefQuad)
         return
 
-def getOmegaMMReaderList(readerList, overall=False):
-    """
-    get omega min/max information from a list of readers
-    """
-    retval = []
-    for reader in num.atleast_1d(readerList):
-        omegaMin, omegaMax = reader.getOmegaMinMax()
-        retval.append((omegaMin,omegaMax))
-    if overall:
-        retval = (min(zip(*retval)[0]), max(zip(*retval)[1]))
-    return retval
-
 # ============================== Utility functions for instantiating detectors
 #
 def detectorList():
