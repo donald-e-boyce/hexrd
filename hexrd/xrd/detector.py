@@ -3697,9 +3697,9 @@ class DetectorGeomGE(Detector2DRC):
     __vdk            = 1800 # made up
     # 200 x 200 micron pixels
     __pixelPitch     = 0.2      # in mm
-    __idim           = ReadGE._ReadGE__idim
-    __nrows          = ReadGE._ReadGE__nrows
-    __ncols          = ReadGE._ReadGE__ncols
+    __idim           = 2048
+    __nrows          = 2048
+    __ncols          = 2048
     __dParamDflt     = [   0.0,       0.0,       0.0,      2.0,      2.0,      2.0]
     __dParamZero     = [   0.0,       0.0,       0.0,      2.0,      2.0,      2.0]
     __dParamScalings = [   1.0,       1.0,       1.0,      1.0,      1.0,      1.0]
@@ -3711,6 +3711,9 @@ class DetectorGeomGE(Detector2DRC):
         if reader is None:
             readerKWArgs = kwargs.pop('readerKWArgs', {})
             reader = ReadGE(None, **readerKWArgs)
+        else:
+            self.__nrows = self.__idim = reader.rnows
+            self.__ncols = reader.ncols
 
         Detector2DRC.__init__(self,
                               self.__nrows, self.__ncols, self.__pixelPitch,
@@ -3817,9 +3820,7 @@ class DetectorGeomFrelon(Detector2DRC):
 
     # 50 X 50 micron pixels
     __pixelPitch     = 0.05      # in mm
-    __idim           = ReadGE._ReadGE__idim
-    __nrows          = ReadGE._ReadGE__nrows
-    __ncols          = ReadGE._ReadGE__ncols
+    __ncols = __nrows = __idim = 2048
     __dParamDflt     = [   0.0,      0.0,     0.0,      2.0,      2.0,      2.0]
     __dParamZero     = [   0.0,      0.0,     0.0,      2.0,      2.0,      2.0]
     __dParamScalings = [   1.0,      1.0,     1.0,      1.0,      1.0,      1.0]

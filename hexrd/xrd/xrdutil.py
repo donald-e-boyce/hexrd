@@ -51,7 +51,7 @@ import hexrd.orientations as ors
 from hexrd.xrd import crystallography
 from hexrd.xrd.crystallography import latticeParameters, latticeVectors
 from hexrd.xrd import detector
-from hexrd.xrd.detector import Framer2DRC
+from hexrd.xrd.image_io import Framer2DRC
 from hexrd.xrd.detector import getCMap
 from hexrd.xrd import xrdbase
 from hexrd.xrd.xrdbase import dataToFrame
