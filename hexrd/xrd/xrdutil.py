@@ -1894,7 +1894,7 @@ def pullFromStack(reader, detectorGeom, tThMM, angWidth, angCen,
 
     'use xyf instead of xyo to reinforce that is in frame instead of omega coordinates'
     xyfCen  = num.array(detectorGeom.angToXYO(*angCen, units='pixels')) # omega is in angles
-    xyfCen[2] = reader.omegaToFrame(xyfCen[2], float=True)
+    xyfCen[2] = reader.omegaToFrame(num.rint(xyfCen[2]))
 
     xyfBBox = detectorGeom.angToXYOBBox(angCen, angPM, units='pixels', reader=reader) # omega is in frame -- passed the reader
     xyfBBox_0 = num.array([sl[0] for sl in xyfBBox])

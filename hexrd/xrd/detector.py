@@ -2859,9 +2859,6 @@ class Detector2DRC(DetectorBase):
     def makeIndicesTThRanges(self, planeData, cullDupl=False):
         """
         return a list of indices for sets of overlaping two-theta ranges;
-        to plot, can do something like:
-                mask = self.reader.getEmptyMask()
-          mask[indices] = True
 
         With cullDupl set true, eliminate HKLs with duplicate 2-thetas
         """

@@ -10,7 +10,6 @@ ThreadReadFrame: class for using threads to read frames
 
 Functions
 ---------
-getNFramesFromBytes - reader function from original detector module
 newGenericReader - returns a reader instance
 
 """
@@ -21,38 +20,58 @@ import warnings
 
 import numpy as num
 
-from frame_series import load_series
+import imageseries
 
 warnings.filterwarnings('always', '', DeprecationWarning)
 
-class OmegaFrameReader(object):
-    """Facade for frame_series class, replacing other readers, primarily ReadGE"""
+class ReaderDeprecationWarning(DeprecationWarning):
+    """Warnings on use of old reader features"""
+    def __init__(self, value):
+        self.value = value
+    def __str__(self):
+        return repr(self.value)
 
-    def __init__(self, fileinfo):
+class OmegaImageSeries(object):
+    """Facade for frame_series class, replacing other readers, primarily ReadGE"""
+    OMEGA_TAG = 'omega'
+
+    def __init__(self, fname, fmt='hdf5', **kwargs):
         """Initialize frame readerOmegaFrameReader
 
-        *fileinfo* is a dictionary including keys for "format" and "filename";
-                      other keys depend on the format and will be passed on
+        *fileinfo* is a string
+        *fmt* is the format to be passed to imageseries.open()
+        *kwargs* is the option list to be passed to imageseries.open()
         """
-        if isinstance(fileinfo, dict):
-            if "format" not in fileinfo or "filename" not in fileinfo:
-                raise RuntimeError('Could not find "name" or "path" in fileinfo.')
-        else:
-            raise RuntimeError('Old style fileinfo no longer in use.')
+        self._imseries = imageseries.open(fname, fmt, **kwargs)
+        self._shape = self._imseries.shape
+        self._meta = self._imseries.metadata
 
-        fmt = fileinfo.pop('format')
-        fname = fileinfo.pop('filename')
-
-        self.frame_series = load_series(fname, fmt, fileinfo)
-
+        if self.OMEGA_TAG not in self._meta:
+            raise RuntimeError('No omega data found in data file')
         return
 
-    # property:  nframeshttps://bugzilla.redhat.com/show_bug.cgi?id=921792
+    def __getitem__(self, k):
+        return self._imseries[k]
 
     @property
     def nframes(self):
-        """(get-only) Number of available data frames"""
-        return len(self.frame_series)
+        """(get-only) number of frames"""
+        return self._shape[0]
+
+    @property
+    def nrows(self):
+        """(get-only) number of rows"""
+        return self._shape[1]
+
+    @property
+    def ncols(self):
+        """(get-only) number of columns"""
+        return self._shape[2]
+
+    @property
+    def omega(self):
+        """ (get-only) array of omega min/max per frame"""
+        return self._meta[self.OMEGA_TAG]
 
     pass
 
@@ -95,250 +114,87 @@ class Framer2DRC(object):
         return self.__frame_dtype_float
     dtypeFloat = property(get_dtypeFloat, None, None)
 
-    @classmethod
-    def maxVal(cls, dtypeRead):
-        """
-        maximum value that can be stored in the image pixel data type;
-        redefine as desired
-        """
-        maxInt = num.iinfo(dtypeRead).max
-        return maxInt
-
     def getEmptyMask(self):
         """convenience method for getting an emtpy mask"""
         # this used to be a class method
-        mask = num.zeros([self.nrows, self.ncols], dtype=bool)
-        return mask
+        return num.zeros([self.nrows, self.ncols], dtype=bool)
 
-    def frame(self, nframes=None, dtype=None, buffer=None, mask=None):
-        if buffer is not None and dtype is None:
-            if hasattr(buffer,'dtype'):
-                dtype = buffer.dtype
-        if dtype is None:
-            dtype = self.__frame_dtype_dflt
-        if nframes is None:
-            shape = (self.nrows, self.ncols)
-        else:
-            assert mask is None,\
-                'not coded: multiframe with mask'
-            shape = (nframes, self.rows, self.ncols)
-        if buffer is None:
-            retval = num.zeros(shape, dtype=dtype)
-        else:
-            retval = num.array(buffer, dtype=dtype).reshape(shape)
-        if mask is not None:
-            retval = num.ma.masked_array(retval, mask, hard_mask=True, copy=False)
-        return retval
+class OmegaFramer(object):
+    """Omega information associated with frame numbers"""
+    def __init__(self, omegas):
+        """Initialize omega ranges
 
-class ReadGeneric(Framer2DRC):
-    """Generic reader with omega information
-"""
-        def __init__(self, filename, ncols, nrows, *args, **kwargs):
-        self.filename        = filename
-        self.__nbytes_header = kwargs.pop('nbytes_header', 0)
-        self.__nempty        = kwargs.pop('nempty', 0)
-        doFlip               = kwargs.pop('doFlip', False)
-        self.subtractDark    = kwargs.pop('subtractDark', False)
+        *omegas* is nframes x 2
 
-        if doFlip is not False:
-            raise NotImplementedError, 'doFlip not False'
-        if self.subtractDark is not False:
-            raise NotImplementedError, 'subtractDark not False'
-
-        Framer2DRC.__init__(self, ncols, nrows, **kwargs)
-
-        self.dark = None
-        self.dead = None
-        self.mask = None
-
-        self.omegaStart = None
-        self.omegaDelta = None
-        self.omegas = None
-        #
-        if len(args) == 0:
-            pass
-        elif len(args) == 2:
-            self.omegaStart = omegaStart = args[0]
-            self.omegaDelta = omegaDelta = args[1]
-        else:
-            raise RuntimeError, 'do not know what to do with args: '+str(args)
-        self.omegas = None
-        if self.omegaStart is not None:
-            if hasattr(omegaStart, 'getVal'):
-                omegaStart = omegaStart.getVal('radians')
-            if hasattr(omegaDelta, 'getVal'):
-                omegaDelta = omegaDelta.getVal('radians')
-            nFramesTot = self.getNFrames()
-            self.omegas = \
-                num.arange(omegaStart, omegaStart+omegaDelta*(nFramesTot-0.5), omegaDelta) + \
-                0.5 * omegaDelta # put omegas at mid-points of omega range for frame
-            omegaEnd = omegaStart+omegaDelta*(nFramesTot)
-            self.omegaMin = min(omegaStart, omegaEnd)
-            self.omegaMax = max(omegaStart, omegaEnd)
-            self.omegaDelta = omegaDelta
-            self.omegaStart = omegaStart
-
-        if len(kwargs) > 0:
-            raise RuntimeError, 'unparsed kwargs : %s' + str(kwargs.keys())
-
-        self.iFrame = -1 # counter for last global frame that was read
-
-        self.img = None
-        if self.filename is not None:
-            self.img = open(self.filename, mode='rb')
-            # skip header for now
-            self.img.seek(self.__nbytes_header, 0)
-            if self.__nempty > 0:
-                self.img.seek(self.nbytesFrame*self.__nempty, 1)
+        Could check for monotonicity.
+        """
+        self._omegas = omegas
+        self._omin = omegas.min()
+        self._omax = omegas.max()
+        self._omean = omegas.mean(axis=1)
+        self._odels = omegas[:, 1] - omegas[:, 0]
+        self._delta = self._odels[0]
+        self._orange = num.hstack((omegas[:, 0], omegas[-1, 1]))
 
         return
 
-    def getFrameUseMask(self):
-        return False
+    # property:
+
+    def _omin(self):
+        return self._omin
+
+    def _omax(self):
+        return self._omax
+
+    def getDeltaOmega(self, nframes=1):
+        return self._omax - self._omin
+
+    def getOmegaMinMax(self):
+        return self._omin, self._omax
+
+    def frameToOmega(self, frame):
+        """can frame be nonintegral? round to int ... """
+        return self._omean[frame]
+
+    def omegaToFrame(self, omega):
+        return  num.searchsorted(self._orange) - 1
+
+
+    def omegaToFrameRange(self, omega):
+        # note: old code assumed single delta omega
+        return omeToFrameRange(omega, self._omean, self._delta)
+
+
+class ReadGeneric(Framer2DRC, OmegaFramer):
+    """Generic reader with omega information
+"""
+    def __init__(self, filename, ncols, nrows, *args, **kwargs):
+
+        Framer2DRC.__init__(self, ncols, nrows, **kwargs)
+        return
 
     def read(self, nskip=0, nframes=1, sumImg=False):
         """
         sumImg can be set to True or to something like numpy.maximum
         """
+        raise RuntimeError("Generic reader not available for reading")
 
-        if self.img is None:
-            raise RuntimeError, 'no image file open'
-
-        'get iFrame ready for how it is used here'
-        self.iFrame = num.atleast_1d(self.iFrame)[-1]
-        iFrameList = []
-        multiframe = nframes > 1
-
-        nFramesInv = 1.0 / nframes
-        doDarkSub = self.subtractDark # and self.dark is not None
-
-        if doDarkSub:
-            assert self.dark is not None, 'self.dark is None'
-
-        # assign storage array
-        if sumImg:
-            sumImgCallable = hasattr(sumImg,'__call__')
-            imgOut = self.frame(dtype=self.dtypeFloat, mask=self.dead)
-        elif multiframe:
-            imgOut = self.frame(nframes=nframes, dtype=self.dtypeDflt, mask=self.dead)
-
-
-        # now read data frames
-        for i in range(nframes):
-
-            #data = self.__readNext(nskip=nskip)
-            #thisframe = data.reshape(self.__nrows, self.__ncols)
-            data = self.__readNext(nskip=nskip) # .reshape(self.__nrows, self.__ncols)
-            self.iFrame += nskip + 1
-            nskip=0 # all done skipping once have the first frame!
-            iFrameList.append(self.iFrame)
-            # dark subtraction
-            if doDarkSub:
-                'used to have self.dtypeFloat here, but self.dtypeDflt does the trick'
-                thisframe = self.frame(buffer=data,
-                                       dtype=self.dtypeDflt, mask=self.dead) - self.dark
-            else:
-                thisframe = self.frame(buffer=data,
-                                       mask=self.dead)
-
-            # masking (True get zeroed)
-            if self.mask is not None:
-                if self.getFrameUseMask():
-                    thisframe[self.mask] = 0
-
-            # assign output
-            if sumImg:
-                if sumImgCallable:
-                    imgOut = sumImg(imgOut, thisframe)
-                else:
-                    imgOut = imgOut + thisframe * nFramesInv
-            elif multiframe:
-                imgOut[i, :, :] = thisframe[:, :]
-        'end of loop over nframes'
-
-        if sumImg:
-            # imgOut = imgOut / nframes # now taken care of above
-            pass
-        elif not multiframe:
-            imgOut = thisframe
-
-        if multiframe:
-            'make iFrame a list so that omega or whatever can be averaged appropriately'
-            self.iFrame = iFrameList
-        return imgOut
-
-    def getNFrames(self, lessEmpty=True):
-        fileBytes = os.stat(self.filename).st_size
-        nFrames = getNFramesFromBytes(fileBytes, self.__nbytes_header, self.nbytesFrame)
-        if lessEmpty:
-            nFrames -= self.__nempty
-        return nFrames
-
-    def getOmegaMinMax(self):
-        assert self.omegas is not None,\
-            """instance does not have omega information"""
-        return self.omegaMin, self.omegaMax
-    def getDeltaOmega(self, nframes=1):
-        assert self.omegas is not None,\
-            """instance does not have omega information"""
-        return self.omegaDelta * nframes
-    def getDark(self):
-        'no dark yet supported'
+    def getNFrames(self):
         return 0
-    def getFrameOmega(self, iFrame=None):
-        """if iFrame is none, use internal counter"""
-        assert self.omegas is not None,\
-            """instance does not have omega information"""
-        if iFrame is None:
-            iFrame = self.iFrame
-        if hasattr(iFrame, '__len__'):
-            'take care of case nframes>1 in last call to read'
-            retval = num.mean(self.omegas[iFrame])
-        else:
-            retval = self.omegas[iFrame]
-        return retval
-
-    def __readNext(self, nskip=0):
-        if self.img is None:
-            raise RuntimeError, 'no image file open'
-
-        if nskip > 0:
-            self.img.seek(self.nbytesFrame*nskip, 1)
-        data = num.fromfile(self.img,
-                            dtype=self.dtypeRead,
-                            count=self.nrows*self.ncols)
-        return data
-
 
 
     def getWriter(self, filename):
         return None
 
-class ReadGE(object):
+class ReadGE(Framer2DRC,OmegaFramer):
     """General reader for omega scans
 
     Originally, this was for reading GE format images, but this is now
     a general reader accessing the OmegaFrameReader facade class. The main
     functionality to read a sequence of images with associated omega ranges.
 
-
     ORIGINAL DOCS
     =============
-    Read in raw GE files; this is the class version of the foregoing functions
-
-    NOTES
-
-    *) The flip axis ('v'ertical) was verified on 06 March 2009 by
-       JVB and UL.  This should be rechecked if the configuration of the GE
-       changes or you are unsure.
-
-    *) BE CAREFUL! nframes should be < 10 or so, or you will run out of
-       memory in the namespace on a typical machine.
-
-    *) The header is currently ignored
-
-    *) If a dark is specified, this overrides the use of empty frames as
-       background; dark can be a file name or frame
 
     *) In multiframe images where background subtraction is requested but no
        dark is specified, attempts to use the
@@ -349,223 +205,60 @@ class ReadGE(object):
     def __init__(self, file_info, *args, **kwargs):
         """Initialize the reader
 
-        *file_info* a dictionary providing file and format specifications
+        *file_info* is now just the filename
+        *kwargs* is a dictionary
+                 keys include: "path" path in hdf5 file
+
+        Of original kwargs, only using "mask"
         """
-        self._ofr = OmegaFrameReader(file_info)  # todo: clarify this
+        self._fname = file_info
+        self._kwargs = kwargs
+        self._omis = OmegaImageSeries(file_info, **kwargs)
+        self.mask = None
 
-        # initialization
-        self.omegas = None
-        self.img = None
-        self.th  = None
-        self.fileInfo      = None
-        self.fileInfoR     = None
-        self.nFramesRemain = None # remaining in current file
-        self.iFrame = -1 # counter for last global frame that was read
+        Framer2DRC.__init__(self, self._omis.nrows, self._omis.ncols)
+        OmegaFramer.__init__(self, self._omis.omega)
 
-
-        if fileInfo is not None:
-            self.__setupRead(fileInfo, self.subtractDark, self.mask, self.omegaStart, self.omegaDelta)
+        # counter for last global frame that was read
+        self.iFrame = -1
 
         return
 
 
+    def __call__(self, *args, **kwargs):
+        return self.read(*args, **kwargs)
+
     @classmethod
-    def display(cls,
-                thisframe,
-                roi = None,
-                pw  = None,
-                **kwargs
-                ):
-        warnings.warn('display method on readers no longer implemented',
-                      ReaderDeprecationWarning)
-
-    def makeNew(self):
-        """return a clean instance for the same data files
-        useful if want to start reading from the beginning"""
-        # Might need this
-        inParmDict = {}
-        inParmDict.update(self.__inParmDict)
-        for key in self.__inParmDict.keys():
-            inParmDict[key] = eval("self."+key)
-        newSelf = self.__class__(self.fileInfo, **inParmDict)
-        return newSelf
-    def getRawReader(self, doFlip=False):
-        new = self.__class__(self.fileInfo, doFlip=doFlip)
-        return new
-
-    def get_nbytes_header(self):
-        return self.__nbytes_header
-    nbytesHeader = property(get_nbytes_header, None, None)
+    def makeNew(cls):
+        """return another copy of this reader"""
+        return cls(self._fname, **self._kwargs)
 
     def getWriter(self, filename):
         return None
 
-    def __setupRead(self, fileInfo, subtractDark, mask, omegaStart, omegaDelta):
-
-        self.fileInfo = fileInfo
-        self.fileListR = self.__convertFileInfo(self.fileInfo)
-        self.fileListR.reverse() # so that pop reads in order
-
-        self.subtractDark = subtractDark
-        self.mask = mask
-
-        assert (omegaStart is None) == (omegaDelta is None),\
-            'must provide either both or neither of omega start and delta'
-        if omegaStart is not None:
-            if hasattr(omegaStart, 'getVal'):
-                omegaStart = omegaStart.getVal('radians')
-            if hasattr(omegaDelta, 'getVal'):
-                omegaDelta = omegaDelta.getVal('radians')
-            nFramesTot = self.getNFrames()
-            self.omegas = \
-                num.arange(omegaStart, omegaStart+omegaDelta*(nFramesTot-0.5), omegaDelta) + \
-                0.5 * omegaDelta # put omegas at mid-points of omega range for frame
-            omegaEnd = omegaStart+omegaDelta*(nFramesTot)
-            self.omegaMin = min(omegaStart, omegaEnd)
-            self.omegaMax = max(omegaStart, omegaEnd)
-            self.omegaDelta = omegaDelta
-            self.omegaStart = omegaStart
-
-        self.__nextFile()
-
-        return
-
     def getNFrames(self):
         """number of total frames with real data, not number remaining"""
-        nFramesTot = self.getNFramesFromFileInfo(self.fileInfo)
-        return nFramesTot
-    def getDeltaOmega(self, nframes=1):
-        assert self.omegas is not None,\
-            """instance does not have omega information"""
-        return self.omegaDelta * nframes
-    def getOmegaMinMax(self):
-        assert self.omegas is not None,\
-            """instance does not have omega information"""
-        return self.omegaMin, self.omegaMax
-    def frameToOmega(self, frame):
-        scalar = num.isscalar(frame)
-        frames = num.asarray(frame)
-        if frames.dtype == int:
-            retval = self.omegas[frames]
-        else:
-            retval = (frames + 0.5) * self.omegaDelta + self.omegaStart
-        if scalar:
-            retval = num.asscalar(retval)
-        return retval
+        return len(self._omis)
+
     def getFrameOmega(self, iFrame=None):
         """if iFrame is none, use internal counter"""
-        assert self.omegas is not None,\
-            """instance does not have omega information"""
         if iFrame is None:
             iFrame = self.iFrame
         if hasattr(iFrame, '__len__'):
-            'take care of case nframes>1 in last call to read'
-            retval = num.mean(self.omegas[iFrame])
+            # in case last read was multiframe
+            oms = [self.frameToOmega(frm) for frm in iFrame]
+            retval = num.mean(num.asarray(oms))
         else:
-            retval = self.omegas[iFrame]
+            retval = self.frameToOmega[iFrame]
         return retval
-    def omegaToFrameRange(self, omega):
-        assert self.omegas is not None,\
-            'instance does not have omega information'
-        assert self.omegaDelta is not None,\
-            'instance does not have omega information'
-        retval = omeToFrameRange(omega, self.omegas, self.omegaDelta)
-        return retval
-    def omegaToFrame(self, omega, float=False):
-        assert self.omegas is not None,\
-            'instance does not have omega information'
-        if float:
-            assert omega >= self.omegaMin and omega <= self.omegaMax,\
-                'omega %g is outside of the range [%g,%g] for the reader' % (omega, self.omegaMin, self.omegaMax)
-            retval = (omega - self.omegaStart)/self.omegaDelta - 0.5*self.omegaDelta
-        else:
-            temp = num.where(self.omegas == omega)[0]
-            assert len(temp) == 1, 'omega not found, or found more than once'
-            retval = temp[0]
-        return retval
-    def getFrameUseMask(self):
-        """this is an optional toggle to turn the mask on/off"""
-        assert isinstance(self.iFrame, int), \
-            'self.iFrame needs to be an int for calls to getFrameUseMask'
-        if self.useMask is None:
-            retval = True
-        else:
-            assert len(self.useMask) == self.getNFrames(),\
-                   "len(useMask) must be %d; yours is %d" % (self.getNFrames(), len(self.useMask))
-            retval = self.useMask[self.iFrame]
-        return retval
-    @classmethod
-    def __getNFrames(cls, fileBytes):
-        retval = getNFramesFromBytes(fileBytes, cls.__nbytes_header, cls.__nbytes_frame)
-        return retval
-    def __nextFile(self):
 
-        # close in case already have a file going
-        self.close()
 
-        fname, nempty = self.fileListR.pop()
-
-        # open file
-        fileBytes = os.stat(fname).st_size
-        self.img = open(fname, mode='rb')
-
-        # skip header for now
-        self.img.seek(self.__nbytes_header, 0)
-
-        # figure out number of frames
-        self.nFramesRemain = self.__getNFrames(fileBytes)
-
-        if nempty > 0:  # 1 or more empty frames
-            if self.dark is None:
-                scale = 1.0 / nempty
-                self.dark = self.frame(dtype=self.__frame_dtype_float)
-                for i in range(nempty):
-                    self.dark = self.dark + num.fromfile(
-                        self.img, **self.__readArgs
-                        ).reshape(self.__nrows, self.__ncols) * scale
-                self.dark.astype(self.__frame_dtype_dflt)
-            else:
-                self.img.seek(self.nbytesFrame*nempty, 1)
-            self.nFramesRemain -= nempty
-
-        if self.subtractDark and self.dark is None:
-            raise RuntimeError, "Requested dark field subtraction, but no file or empty frames specified!"
-
-        return
-    @staticmethod
-    def __convertFileInfo(fileInfo):
-        if isinstance(fileInfo,str):
-            fileList = [(fileInfo, 0)]
-        elif hasattr(fileInfo,'__len__'):
-            assert len(fileInfo) > 0, 'length zero'
-            if hasattr(fileInfo[0],'__iter__'): # checking __len__ bad because has len attribute
-                fileList = copy.copy(fileInfo)
-            else:
-                assert len(fileInfo) == 2, 'bad file info'
-                fileList = [fileInfo]
-        else:
-            raise RuntimeError, 'do not know what to do with fileInfo '+str(fileInfo)
-        # fileList.reverse()
-        return fileList
     def readBBox(self, bbox, raw=True, doFlip=None):
         """
         with raw=True, read more or less raw data, with bbox = [(iLo,iHi),(jLo,jHi),(fLo,fHi)]
 
-        careful: if raw is True, must set doFlip if want frames
-        potentially flipped; can set it to a reader instance to pull
-        the doFlip value from that instance
         """
-
-        if raw:
-            if hasattr(doFlip,'doFlip'):
-                'probably a ReadGe instance, pull doFlip from it'
-                doFlip = doFlip.doFlip
-            doFlip = doFlip or False # set to False if is None
-            reader = self.getRawReader(doFlip=doFlip)
-        else:
-            assert doFlip is None, 'do not specify doFlip if raw is True'
-            reader = self.makeNew()
-
+        # implement in OmegaFrameReader
         nskip = bbox[2][0]
         bBox = num.array(bbox)
         sl_i = slice(*bBox[0])
@@ -579,148 +272,14 @@ class ReadGE(object):
             thisframe = reader.read(nskip=nskip)
             nskip = 0
             retval[:,:,iFrame] = copy.deepcopy(thisframe[sl_i, sl_j])
-        if not raw and self.dead is not None:
-            # used to be self.deadFlipped, but flipping now assumed done before loading
-            mask = num.tile(self.dead[sl_i, sl_j].T, (retval.shape[2],1,1)).T
-            retval = num.ma.masked_array(retval, mask, hard_mask=True, copy=False)
         return retval
 
     def getDark(self):
-        if self.dark is None:
-            retval = 0
-        else:
-            retval = self.dark
-        return retval
-    def read(self, nskip=0, nframes=1, sumImg=False):
-        """
-        sumImg can be set to True or to something like numpy.maximum
-        """
-
-        'get iFrame ready for how it is used here'
-        self.iFrame = num.atleast_1d(self.iFrame)[-1]
-        iFrameList = []
-        multiframe = nframes > 1
-
-        nFramesInv = 1.0 / nframes
-        doDarkSub = self.subtractDark # and self.dark is not None
-
-        if doDarkSub:
-            assert self.dark is not None, 'self.dark is None'
-
-        # assign storage array
-        if sumImg:
-            sumImgCallable = hasattr(sumImg,'__call__')
-            imgOut = self.frame(dtype=self.__frame_dtype_float, mask=self.dead)
-        elif multiframe:
-            imgOut = self.frame(nframes=nframes, dtype=self.__frame_dtype_dflt, mask=self.dead)
-
-
-        # now read data frames
-        for i in range(nframes):
-
-            #data = self.__readNext(nskip=nskip)
-            #thisframe = data.reshape(self.__nrows, self.__ncols)
-            data = self.__readNext(nskip=nskip) # .reshape(self.__nrows, self.__ncols)
-            self.iFrame += nskip + 1
-            nskip=0 # all done skipping once have the first frame!
-            iFrameList.append(self.iFrame)
-            # dark subtraction
-            if doDarkSub:
-                'used to have self.__frame_dtype_float here, but self.__frame_dtype_dflt does the trick'
-                thisframe = self.frame(buffer=data,
-                                       dtype=self.__frame_dtype_dflt, mask=self.dead) - self.dark
-            else:
-                thisframe = self.frame(buffer=data,
-                                       mask=self.dead)
-
-            # masking (True get zeroed)
-            if self.mask is not None:
-                if self.getFrameUseMask():
-                    thisframe[self.mask] = 0
-
-            # assign output
-            if sumImg:
-                if sumImgCallable:
-                    imgOut = sumImg(imgOut, thisframe)
-                else:
-                    imgOut = imgOut + thisframe * nFramesInv
-            elif multiframe:
-                imgOut[i, :, :] = thisframe[:, :]
-        'end of loop over nframes'
-
-        if sumImg:
-            # imgOut = imgOut / nframes # now taken care of above
-            pass
-        elif not multiframe:
-            imgOut = thisframe
-
-        if multiframe:
-            'make iFrame a list so that omega or whatever can be averaged appropriately'
-            self.iFrame = iFrameList
-        return imgOut
-
-    def __readNext(self, nskip=0):
-
-        if self.img is None:
-            raise RuntimeError, 'no image file set'
-
-        nHave = 0
-
-        nskipThis = nskip
-        if nskipThis > 0 and data is not None:
-            nskipThis = nskipThis - 1
-            data = None
-        if data is not None : nHave = 1
-        #
-        while self.nFramesRemain+nHave - nskipThis < 1:
-            'not enough frames left in this file'
-            nskipThis = nskipThis - self.nFramesRemain
-            self.nFramesRemain = 0 # = self.nFramesRemain - self.nFramesRemain
-            self.__nextFile()
-        if nskipThis > 0:
-            # advance counter past empty frames
-            self.img.seek(self.nbytesFrame*nskipThis, 1)
-            self.nFramesRemain -= nskipThis
-
-        if data is None:
-            # grab current frame
-            data = num.fromfile(self.img, **self.__readArgs)
-            data = num.array(data, **self.__castArgs)
-            self.nFramesRemain -= 1
-
-        return data
-    def __call__(self, *args, **kwargs):
-        return self.read(*args, **kwargs)
-
-    def close(self):
-        # if already have a file going, close it out
-        if self.img is not None:
-            self.img.close()
-        return
-    """
-    getReadDtype function replaced by dtypeRead property
-    """
-    @classmethod
-    def maxVal(cls):
-        'maximum value that can be stored in the image pixel data type'
-        # dtype = reader._ReadGE__frame_dtype
-        # maxInt = num.iinfo(cls.__frame_dtype_read).max # bigger than it really is
-        maxInt = 2 ** 14
-        return maxInt
-    @classmethod
-    def getNFramesFromFileInfo(cls, fileInfo, lessEmpty=True):
-        fileList = cls.__convertFileInfo(fileInfo)
-        nFramesTot = 0
-        for fname, nempty in fileList:
-            fileBytes = os.stat(fname).st_size
-            nFrames = cls.__getNFrames(fileBytes)
-            if lessEmpty:
-                nFrames -= nempty
-            nFramesTot += nFrames
-        return nFramesTot
+        return 0
 
     def indicesToMask(self, indices):
-      """
+      """Create mask from list of indices
+
       Indices can be a list of indices, as from makeIndicesTThRanges
       """
       mask = self.getEmptyMask()
@@ -730,6 +289,71 @@ class ReadGE(object):
       else:
         mask[indices] = True
       return mask
+
+    def read(self, nskip=0, nframes=1, sumImg=False):
+        """Read one or more frames, possibly operating on them
+
+        This returns a single frame is nframes is 1, multiple
+        frames if nframes > 1 with sumImg off, or a single frame
+        resulting from some operation on the multiple frames if
+        sumImg is true or a function.
+
+        *sumImg* can be set to True or to a function of two frames like numpy.maximum
+        *nskip* applies only to the first frame
+        """
+        self.iFrame = num.atleast_1d(self.iFrame)[-1] + nskip
+
+        multiframe = nframes > 1
+        sumimg_callable = hasattr(sumImg, '__call__')
+
+        if not multiframe:
+            self.iFrame += 1
+            img = self._omis[self.iFrame]
+            if self.mask is not None:
+                img[self.mask] = 0
+            return img
+
+        # multiframe case
+        self.iFrame = self.iFrame + 1 + range(nframes)
+
+        if not sumImg:
+            # return multiple frames
+            imgs = self._omis[self.iFrame]
+            for i in range(nframes):
+                if self.mask is not None:
+                    imgs[i, self.mask] = 0
+            return imgs
+
+        # Now, operate on frames consecutively
+        op = sumImg if sumimg_callable else num.add
+
+        ifrm = self.iFrame + 1
+
+        img = self._omis[ifrm]
+        for i in range(1, nframes):
+            ifrm += 1
+            img = op(img, self._omis[ifrm])
+        if not sumimg_callable:
+            img = img * (1.0/nframes)
+
+        if self.mask is not None:
+            img[self.mask] = 0
+
+        return img
+
+    def close(self):
+        return
+
+    @classmethod
+    def display(cls,
+                thisframe,
+                roi = None,
+                pw  = None,
+                **kwargs
+                ):
+        warnings.warn('display method on readers no longer implemented',
+                      ReaderDeprecationWarning)
+
 #
 # Module functions
 #
@@ -743,14 +367,6 @@ def omeToFrameRange(omega, omegas, omegaDelta):
     retval = num.where(num.abs(omegas - omega) <= omegaDelta*0.5)[0]
     return retval
 
-def getNFramesFromBytes(fileBytes, nbytesHeader, nbytesFrame):
-    assert (fileBytes - nbytesHeader) % nbytesFrame == 0,\
-        'file size not correct'
-    nFrames = int((fileBytes - nbytesHeader) / nbytesFrame)
-    if nFrames*nbytesFrame + nbytesHeader != fileBytes:
-        raise RuntimeError, 'file size not correctly calculated'
-    return nFrames
-
 def newGenericReader(ncols, nrows, *args, **kwargs):
     """ Currently just returns a Framer2DRC
     """
@@ -761,9 +377,3 @@ def newGenericReader(ncols, nrows, *args, **kwargs):
 
     return retval
 
-class ReaderDeprecationWarning(DeprecationWarning):
-    """Warnings on use of old reader features"""
-    def __init__(self, value):
-        self.value = value
-    def __str__(self):
-        return repr(self.value)
