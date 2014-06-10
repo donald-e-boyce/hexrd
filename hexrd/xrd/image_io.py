@@ -238,7 +238,7 @@ class ReadGE(Framer2DRC,OmegaFramer):
 
     def getNFrames(self):
         """number of total frames with real data, not number remaining"""
-        return len(self._omis)
+        return self._omis.nframes
 
     def getFrameOmega(self, iFrame=None):
         """if iFrame is none, use internal counter"""

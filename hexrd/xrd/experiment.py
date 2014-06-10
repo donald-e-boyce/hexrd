@@ -976,7 +976,7 @@ This class is for holding input required to
 instantiate a reader object.  Currently, only
 GE reader is supported.
 """
-    # Class data
+    # Class data [to be removed, but keeping until GUI is updated]
     DFLT_NAME = 'unnamed reader'
     #
     DARK_MODES = (DARK_MODE_NONE,
@@ -1004,14 +1004,18 @@ GE reader is supported.
         """Constructor for ReaderInput
 
         INPUT
-        name -- [optional] (str) name
-        desc -- [optional] (str) description
-
-        NOTES
-        * currently only GE reader is supported
+        *name* - [optional] (str) name
+        *desc* - [optional] (str) description
 """
         self.name = name
         self.desc = desc
+
+        self._file = None
+        self._fmt = 'hdf5' # default
+        self._args = []
+
+        # ===== Below here  to be deleted on GUI update
+        #
         # Image Mode
         # . imageDict contains tuple of (#empty, o-min, o-max, o-del)
         self.imageMode = ImageModes.SINGLE_FRAME
@@ -1022,23 +1026,52 @@ GE reader is supported.
         self.darkMode = ReaderInput.DARK_MODE_NONE
         self.darkDir  = ''
         self.darkName = ''
-        # File aggregation
+        # File aggregation [maybe save this]
         self.aggFun = ReaderInput.AGG_FUN_NONE
         # Flip options
         self.flipMode = ReaderInput.FLIP_NONE
         #
         return
 
-    def _check(self):
-        """Check that input is ok for making a reader instance
-"""
-        # * Empty frames = 0 for single frame mode
-        return
     #
     # ============================== API
     #
     #                     ========== Properties
     #
+    @property
+    def filename(self):
+        """Name of imageseries file"""
+        return self._file
+
+    @filename.setter
+    def filename(self, v):
+        """Set method for filename"""
+        self._file = v
+        return
+
+    @property
+    def args(self):
+        """arguments for imageseries construction"""
+        return self._args
+
+    @args.setter
+    def args(self, d):
+        """Set args to a dictionary of values"""
+        self._args = d
+        return
+
+    @property
+    def format(self):
+        """imageseries format"""
+        return self._fmt
+
+    @format.setter
+    def format(self, v):
+        """Set method for format"""
+        self._fmt = v
+        return
+
+
     # property:  hasImages
 
     @property
@@ -1118,66 +1151,10 @@ GE reader is supported.
         return n
 
     def makeReader(self):
-        """Return a reader instance based on self
-"""
-        # check validity of input
-        self._check()
-        #
-        # Set up image names in right format
-        #
-        fullPath = lambda fn: os.path.join(self.imageDir, fn)
-        numEmpty = lambda fn: self.imageNameD[fn][0]
-        imgInfo = [(fullPath(f), numEmpty(f)) for f in self.imageNames]
+        """Return a reader instance based on self"""
+        print 'making reader ... ', self.filename, self.args
+        return self.RC(self.filename, **self.args)
 
-        ref_reader = self.RC(imgInfo)
-        #
-        # Check for omega info
-        #
-        nfile = len(imgInfo)
-        dinfo = [self.imageNameD[f] for f in self.imageNames]
-        omin = dinfo[0][1]
-        if omin is not None:
-            odel = dinfo[nfile - 1][3]
-            print "omega min and delta: ", omin, odel
-            omargs = (valunits.valWUnit('omin', 'angle', float(omin), 'degrees'),
-                      valunits.valWUnit('odel', 'angle', float(odel), 'degrees'))
-        else:
-            omargs = ()
-            pass
-        print 'omargs:  ', omargs
-        #
-        # Dark file
-        #
-        subDark = not (self.darkMode == ReaderInput.DARK_MODE_NONE)
-        if (self.darkMode == ReaderInput.DARK_MODE_FILE):
-            drkFile = os.path.join(self.darkDir, self.darkName)
-        elif (self.darkMode == ReaderInput.DARK_MODE_ARRAY):
-            drkFileName = os.path.join(self.darkDir, self.darkName)
-            drkFile     = ref_reader.frame(
-                buffer=numpy.fromfile(drkFileName,
-                                      dtype=ref_reader.dtypeRead
-                                      )
-                )
-        else:
-            drkFile = None
-            pass
-        #
-        # Flip options
-        #
-        doFlip  = not (self.flipMode == ReaderInput.FLIP_NONE)
-        flipArg = ReaderInput.FLIP_DICT[self.flipMode]
-        #
-        # Make the reader
-        #
-        print 'reader:  \n', imgInfo, subDark, drkFile, doFlip, flipArg
-        r = self.RC(imgInfo, *omargs,
-                    subtractDark = subDark,
-                    dark         = drkFile,
-                    doFlip       = doFlip,
-                    flipArg      = flipArg)
-
-        return r
-    #
     pass  # end class
 #
 # -----------------------------------------------END CLASS:  geReaderInput
