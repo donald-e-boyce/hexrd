@@ -40,7 +40,10 @@ from scipy import ndimage
 import matplotlib
 from matplotlib.widgets import Slider, Button, RadioButtons
 from matplotlib import cm, colors
-import matplotlib.collections as collections
+try:
+    import matplotlib.collections as collections
+except:
+    collections = None
 
 from hexrd import plotwrap
 from hexrd import tens

@@ -102,9 +102,11 @@ def open_dset(a, shp, dtp):
             raise MakeImageSeriesError(errmsg)
     else:
         f = h5py.File(a.outfile, "a")
+        chsize = (1, int(numpy.floor(1e6/shp[1])), shp[1]) if shp[1] < 1.e6 else True
         try:
             ds = f.create_dataset(a.dset, (0, shp[0], shp[1]), dtp,
-                                  maxshape=(None, shp[0], shp[1]))
+                                  maxshape=(None, shp[0], shp[1]), chunks=chsize,
+                compression="gzip")
         except Exception as e:
             errmsg = '%s: %s\n...  exception: ' % (ERR_OVERWRITE, DSetPath(a.outfile, a.dset))
             raise MakeImageSeriesError(errmsg + str(e))
@@ -248,8 +250,8 @@ def set_options():
 
     # image processing options
     parser.add_argument("--flip",
-                        help="reorient the image according to",
-                        metavar="N", action="store", default=None)
+                        help="reorient the image according to specification",
+                        metavar="FLIPARG", action="store", default=None)
 
     parser.add_argument("--empty", "--blank",
                         help="number of blank frames in beginning of file",

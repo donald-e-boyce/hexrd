@@ -341,6 +341,7 @@ def spotFinderSingle(
 
     bin = getBin(thisframe, threshold, padSpot)
     labels, numSpots = ndimage.label(bin, structureNDI_label)
+    labels = labels.astype(int)
 
     # find objects gives slices which are like bounding boxes
     objs = ndimage.find_objects(labels)
@@ -4516,7 +4517,6 @@ class Spots(object):
                             if spotIndexsUnique[0] == 0:
                                 spotIndexsUnique = spotIndexsUnique[1:]
                             for index in spotIndexsUnique:
-
                                 iSpot = index-1
                                 spotData = spotDataList[iSpot]
                                 assert spotData['index'] == index, 'index mismatch'

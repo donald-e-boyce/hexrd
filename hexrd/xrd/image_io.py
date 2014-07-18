@@ -41,6 +41,10 @@ class OmegaImageSeries(object):
         *fileinfo* is a string
         *fmt* is the format to be passed to imageseries.open()
         *kwargs* is the option list to be passed to imageseries.open()
+
+        NOTES:
+        * The shape returned from imageseries is cast to int from numpy.uint64
+          to allow for addition of indices with regular ints
         """
         self._imseries = imageseries.open(fname, fmt, **kwargs)
         self._shape = self._imseries.shape
@@ -51,6 +55,7 @@ class OmegaImageSeries(object):
         return
 
     def __getitem__(self, k):
+        print 'new image: ', k
         return self._imseries[k]
 
     @property
@@ -249,7 +254,7 @@ class ReadGE(Framer2DRC,OmegaFramer):
             oms = [self.frameToOmega(frm) for frm in iFrame]
             retval = num.mean(num.asarray(oms))
         else:
-            retval = self.frameToOmega[iFrame]
+            retval = self.frameToOmega(iFrame)
         return retval
 
 

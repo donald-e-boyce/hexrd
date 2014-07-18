@@ -1152,7 +1152,6 @@ GE reader is supported.
 
     def makeReader(self):
         """Return a reader instance based on self"""
-        print 'making reader ... ', self.filename, self.args
         return self.RC(self.filename, **self.args)
 
     pass  # end class
