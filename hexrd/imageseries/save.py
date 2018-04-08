@@ -68,6 +68,12 @@ class Writer(object):
         self._fname_base = tmp[0]
         self._fname_suff = tmp[1]
 
+    @property
+    def options(self):
+        """(get-only) write options passed to save function"""
+        return self._opts
+
+
     pass  # end class
 
 
@@ -144,7 +150,7 @@ class WriteFrameCache(Writer):
         meta - metadata dictionary
         """
         Writer.__init__(self, ims, fname, **kwargs)
-        self._thresh = self._opts['threshold']
+        self._thresh = self.options['threshold']
         cf = kwargs['cache_file']
         if os.path.isabs(cf):
             self._cache = cf
@@ -201,11 +207,11 @@ class WriteFrameCache(Writer):
         arrd.update(self._process_meta())
         np.savez_compressed(self._cache, **arrd)
 
-    def write(self, output_yaml=False):
+    def write(self):
         """writes frame cache for imageseries
 
         presumes sparse forms are small enough to contain all frames
         """
         self._write_frames()
-        if output_yaml:
+        if self.options.get('output_yaml', False):
             self._write_yml()

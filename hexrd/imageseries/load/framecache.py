@@ -15,13 +15,14 @@ class FrameCacheImageSeriesAdapter(ImageSeriesAdapter):
 
     format = 'frame-cache'
 
-    def __init__(self, fname, style='npz', **kwargs):
+    def __init__(self, fname, **kwargs):
         """Constructor for frame cache image series
 
         *fname* - filename of the yml file
         *kwargs* - keyword arguments (none required)
         """
         self._fname = fname
+        style = kwargs.get('style', 'npz')
         if style.lower() in ('yml', 'yaml', 'test'):
             self._load_yml()
             self._load_cache(from_yml=True)
@@ -48,7 +49,7 @@ class FrameCacheImageSeriesAdapter(ImageSeriesAdapter):
             else:
                 cachepath = os.path.join(bpath, self._cache)
             arrs = np.load(cachepath)
-            
+
             for i in range(self._nframes):
                 row = arrs["%d_row" % i]
                 col = arrs["%d_col" % i]
@@ -60,7 +61,7 @@ class FrameCacheImageSeriesAdapter(ImageSeriesAdapter):
             arrs = np.load(self._fname)
             # HACK: while the loaded npz file has a getitem method
             # that mimicks a dict, it doesn't have a "pop" method.
-            # must make an empty dict to pop after assignment of 
+            # must make an empty dict to pop after assignment of
             # class attributes so we can get to the metadata
             keysd = dict.fromkeys(arrs.keys())
             self._nframes = int(arrs['nframes'])
@@ -77,14 +78,14 @@ class FrameCacheImageSeriesAdapter(ImageSeriesAdapter):
                 keysd.pop("%d_col" % i)
                 keysd.pop("%d_data" % i)
                 frame = csr_matrix((data, (row, col)),
-                                   shape=self._shape, 
+                                   shape=self._shape,
                                    dtype=self._dtype)
                 self._framelist.append(frame)
             # all rmaining keys should be metadata
             for key in keysd:
                 keysd[key] = arrs[key]
             self._meta = keysd
-            
+
 
     @property
     def metadata(self):
@@ -97,7 +98,7 @@ class FrameCacheImageSeriesAdapter(ImageSeriesAdapter):
 
         Currently returns none
         """
-        # TODO: Remove this. Currently not used; 
+        # TODO: Remove this. Currently not used;
         # saved temporarily for np.array trigger
         metad = {}
         for k, v in indict.items():

@@ -1,4 +1,5 @@
 import os
+import unittest
 import tempfile
 
 import numpy as np
@@ -79,35 +80,45 @@ class TestFormatH5(ImageSeriesFormatTest):
 class TestFormatFrameCache(ImageSeriesFormatTest):
 
     def setUp(self):
-        self.fcfile = os.path.join(self.tmpdir,  'frame-cache.yml')
+        self.fcyaml = os.path.join(self.tmpdir,  'frame-cache.yml')
+        self.cache_file='frame-cache.npz'
         self.fmt = 'frame-cache'
         self.thresh = 0.5
-        self.cache_file='frame-cache.npz'
         self.is_a = make_array_ims()
+        self.npys = [] # list of npy files to remove
 
     def tearDown(self):
-        os.remove(self.fcfile)
+        if os.path.exists(self.fcyaml):
+            os.remove(self.fcyaml)
+        for npy in self.npys:
+            os.remove(npy)
         os.remove(os.path.join(self.tmpdir, self.cache_file))
 
 
-    def test_fmtfc(self):
-        """save/load frame-cache format"""
-        imageseries.write(self.is_a, self.fcfile, self.fmt,
-            threshold=self.thresh, cache_file=self.cache_file)
-        is_fc = imageseries.open(self.fcfile, self.fmt)
+    def test_fmtfc_yaml(self):
+        """save/load frame-cache yaml format"""
+        imageseries.write(self.is_a, self.fcyaml, self.fmt,
+                          threshold=self.thresh,
+                          cache_file=self.cache_file,
+                          output_yaml=True)
+        is_fc = imageseries.open(self.fcyaml, self.fmt, style='yaml')
         diff = compare(self.is_a, is_fc)
         self.assertAlmostEqual(diff, 0., "frame-cache reconstruction failed")
         self.assertTrue(compare_meta(self.is_a, is_fc))
 
-    def test_fmtfc_nparray(self):
+    def test_fmtfc_yaml_nparray(self):
         """frame-cache format with numpy array metadata"""
         key = 'np-array'
         npa = np.array([0,2.0,1.3])
         self.is_a.metadata[key] = npa
 
-        imageseries.write(self.is_a, self.fcfile, self.fmt,
-            threshold=self.thresh, cache_file=self.cache_file)
-        is_fc = imageseries.open(self.fcfile, self.fmt)
+        imageseries.write(self.is_a, self.fcyaml, self.fmt,
+                          threshold=self.thresh,
+                          cache_file=self.cache_file,
+                          output_yaml=True)
+        self.npys.append(os.path.join(self.tmpdir, 'frame-cache-%s.npy' % key))
+
+        is_fc = imageseries.open(self.fcyaml, self.fmt, style='yaml')
         meta = is_fc.metadata
         diff = np.linalg.norm(meta[key] - npa)
         self.assertAlmostEqual(diff, 0.,
