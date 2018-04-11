@@ -123,3 +123,45 @@ class TestFormatFrameCache(ImageSeriesFormatTest):
         diff = np.linalg.norm(meta[key] - npa)
         self.assertAlmostEqual(diff, 0.,
                                "frame-cache numpy array metadata failed")
+
+    def test_fmtfc_npz(self):
+        """save/load frame-cache npz format"""
+        cache_path = os.path.join(self.tmpdir, self.cache_file)
+        imageseries.write(self.is_a, '', self.fmt,
+                          threshold=self.thresh,
+                          cache_file=cache_path,
+                          output_yaml=False)
+
+        is_fc = imageseries.open(cache_path, self.fmt, style='npz')
+        diff = compare(self.is_a, is_fc)
+        self.assertAlmostEqual(diff, 0., "frame-cache (npz) reconstruction failed")
+
+    def test_fmtfc_npz_nparray(self):
+        """save/load frame-cache npz format with numpy array as metadata"""
+        key = 'np-array'
+        npa = np.array([0,2.0,1.3])
+        self.is_a.metadata[key] = npa
+
+        cache_path = os.path.join(self.tmpdir, self.cache_file)
+        imageseries.write(self.is_a, '', self.fmt,
+                          threshold=self.thresh,
+                          cache_file=cache_path,
+                          output_yaml=False)
+
+        is_fc = imageseries.open(cache_path, self.fmt, style='npz')
+        meta = is_fc.metadata
+
+        diff = np.linalg.norm(meta[key] - npa)
+        self.assertAlmostEqual(diff, 0.,
+                               "frame-cache numpy array metadata failed")
+
+    def test_fmtfc_npz_meta(self):
+        """save/load frame-cache npz format with generic metadata"""
+        cache_path = os.path.join(self.tmpdir, self.cache_file)
+        imageseries.write(self.is_a, '', self.fmt,
+                          threshold=self.thresh,
+                          cache_file=cache_path,
+                          output_yaml=False)
+
+        is_fc = imageseries.open(cache_path, self.fmt, style='npz')
+        self.assertTrue(compare_meta(self.is_a, is_fc))

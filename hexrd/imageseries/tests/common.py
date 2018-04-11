@@ -40,8 +40,21 @@ def make_meta():
     return {'testing': '1,2,3'}
 
 def compare_meta(ims1, ims2):
-    # check metadata (simple immutable cases only for now)
+    # check metadata
+    # . originally only checked for mutable items
 
-    m1 = set(ims1.metadata.items())
-    m2 = set(ims2.metadata.items())
-    return m1.issubset(m2) and m2.issubset(m1)
+    m1 = ims1.metadata
+    m2 = ims2.metadata
+
+    if not len(m1) == len(m2):
+        return False
+
+    for k in m1:
+        if k not in m2:
+            return False
+        if type(m1[k]) is not type(m2[k]):
+            return False
+        if not m1[k] == m2[k]:
+            return False
+
+    return True
