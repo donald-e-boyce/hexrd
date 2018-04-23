@@ -73,7 +73,7 @@ the HKL evaluation.
 from collections import OrderedDict
 from math import sqrt, floor
 
-import hexrd.xrd.sglite as sglite
+import hexrd.sglite as sglite
 #
 __all__ = ['SpaceGroup']
 #

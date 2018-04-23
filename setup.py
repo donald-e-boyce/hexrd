@@ -66,26 +66,26 @@ cmdclass['test'] = test
 
 
 # for SgLite
-srclist = [
+sglite_srcs = [
     'sgglobal.c', 'sgcb.c', 'sgcharmx.c', 'sgfile.c', 'sggen.c', 'sghall.c',
     'sghkl.c', 'sgltr.c', 'sgmath.c', 'sgmetric.c', 'sgnorm.c', 'sgprop.c',
     'sgss.c', 'sgstr.c', 'sgsymbols.c', 'sgtidy.c', 'sgtype.c', 'sgutil.c',
     'runtests.c', 'sglitemodule.c'
     ]
-srclist = [os.path.join('hexrd/sglite', f) for f in srclist]
+sglite_srcs = [os.path.join('hexrd','sglite', f) for f in sglite_srcs]
 sglite_mod = Extension(
-    'hexrd.xrd.sglite',
-    sources=srclist,
+    'hexrd.sglite',
+    sources=sglite_srcs,
     define_macros=[('PythonTypes', 1)]
     )
 
 
 # for transforms
-srclist = ['transforms_CAPI.c', 'transforms_CFUNC.c']
-srclist = [os.path.join('hexrd/transforms', f) for f in srclist]
+transforms_srcs = ['transforms_CAPI.c', 'transforms_CFUNC.c']
+transforms_srcs = [os.path.join('hexrd', 'transforms', 'src' , f) for f in transforms_srcs]
 transforms_mod = Extension(
-    'hexrd.xrd._transforms_CAPI',
-    sources=srclist,
+    'hexrd._transforms_CAPI',
+    sources=transforms_srcs,
     include_dirs=[np_include_dir]
     )
 

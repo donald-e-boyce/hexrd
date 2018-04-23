@@ -29,7 +29,7 @@
 import numpy as np
 import sys
 
-from hexrd.xrd import _transforms_CAPI
+from hexrd import _transforms_CAPI
 
 from numpy import float_ as nFloat
 from numpy import int_ as nInt
