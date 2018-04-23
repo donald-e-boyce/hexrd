@@ -11,6 +11,18 @@ static double sqrt_epsf = 1.5e-8;
 
 static double Zl[3] = {0.0,0.0,1.0};
 
+static inline
+void set_identity_matrix33(double * rPtr)
+{
+  int i;
+  for (i = 0; i < 9; i ++) {
+    if ( i%4 != 0 )
+      rPtr[i] = 0.0;
+    else
+      rPtr[i] = 1.0;
+  }
+}
+
 /******************************************************************************/
 /* Functions */
 
@@ -640,12 +652,7 @@ void makeRotMatOfExpMap_cfunc(double * ePtr, double * rPtr)
   int i;
   double c, s, phi;
 
-  for (i=0; i<9; i++) {
-    if ( i%4 != 0 )
-      rPtr[i] = 0.0;
-    else
-      rPtr[i] = 1.0;
-  }
+  set_identity_matrix33(rPtr);
 
   phi = sqrt(ePtr[0]*ePtr[0]+ePtr[1]*ePtr[1]+ePtr[2]*ePtr[2]);
 
@@ -700,12 +707,7 @@ void makeRotMatOfQuat_cfunc(int nq, double * qPtr, double * rPtr)
       rPtr[9*i+8] = c + n[2]*n[2]*(1. - c);
     }
     else {
-      for (j=0; j<9; i++) {
-	if ( j%4 == 0 )
-	  rPtr[9*i+j] = 1.0;
-	else
-	  rPtr[9*i+j] = 0.0;
-      }
+      set_identity_matrix33(rPtr+9*i);
     }
   }
 }
