@@ -1,0 +1,21 @@
+name: hexrd-develop
+
+dependencies:
+  - python        =2
+  - dill
+  - fabio
+  - h5py
+  - numba
+  - numpy
+  - progressbar   >=2.3
+  - pyyaml
+  - scikit-learn
+  - scipy
+  - ipython
+
+# UI related only?
+#  - matplotlib
+#  - python.app # [osx]
+#  - scikit-image
+#  - qtconsole
+#  - wxpython
