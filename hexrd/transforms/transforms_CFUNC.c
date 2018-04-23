@@ -649,7 +649,6 @@ void makeOscillRotMat_cfunc(double chi, double ome, double * rPtr)
 
 void makeRotMatOfExpMap_cfunc(double * ePtr, double * rPtr)
 {
-  int i;
   double c, s, phi;
 
   set_identity_matrix33(rPtr);
@@ -682,7 +681,7 @@ void makeRotMatOfExpMap_cfunc(double * ePtr, double * rPtr)
 
 void makeRotMatOfQuat_cfunc(int nq, double * qPtr, double * rPtr)
 {
-  int i, j;
+  int i;
   double c, s, phi, n[3]={0.0,0.0,0.0};
 
   for (i=0; i<nq; i++) {
