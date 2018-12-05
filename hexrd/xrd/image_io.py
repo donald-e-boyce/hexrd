@@ -87,7 +87,7 @@ class _OmegaImageSeries(object):
         """ (get-only) array of omega begin/end per frame"""
         if self.OMEGA_TAG in self._meta:
             return self._meta[self.OMEGA_TAG]
-        else: 
+        else:
             return np.zeros((self.nframes,2))
 
 
@@ -154,8 +154,8 @@ class OmegaFramer(object):
         Could check for monotonicity.
         """
         self._omegas = omegas
-        self._ombeg = omegas[0, :]
-        self._omend = omegas[1, :]
+        self._ombeg = omegas[:, 0]
+        self._omend = omegas[:, 1]
         self._omean = omegas.mean(axis=0)
         self._odels = omegas[:, 1] - omegas[:, 0]
         self._delta = self._odels[0]
